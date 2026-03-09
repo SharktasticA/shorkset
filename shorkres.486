@@ -1,0 +1,62 @@
+#!/bin/sh
+
+######################################################
+##             SHORK UTILITY - SHORKRES             ##
+######################################################
+## A utility for SHORK 486 that changes the         ##
+## system's display resolution                      ##
+######################################################
+## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
+######################################################
+## Kali (sharktastica.co.uk)                        ##
+######################################################
+
+
+
+. "/usr/bin/shorkcommon.sh"
+
+set -e
+
+CFG=""
+FB_RES="/etc/fb.res"
+RES="80x24 | vga | svga | xga"
+
+if [ -f /boot/grub/grub.cfg ]; then
+    CFG="/boot/grub/grub.cfg"
+elif [ -f /boot/syslinux/syslinux.cfg ]; then
+    CFG="/boot/syslinux/syslinux.cfg"
+fi
+
+get_term_size
+
+if [ $# -ne 1 ]; then
+    printf "Changes the system's display resolution.\n\n" | fold -s -w "$TERM_WIDTH"
+    echo "Usage: shorkres {$RES}" | fold -s -w "$TERM_WIDTH"
+    echo "Current resolution: $([ -f $FB_RES ] && cat $FB_RES || echo 80x24)"
+
+    exit 1
+fi
+
+case "$1" in
+    80x24)
+        MODE="vga=normal"
+        ;;
+    vga)
+        MODE="vga=785"
+        ;;
+    svga)
+        MODE="vga=788"
+        ;;
+    xga)
+        MODE="vga=791"
+        ;;
+    *)
+        echo "Invalid resolution: $1"
+        echo "Available resolutions: $RES"
+        exit 1
+    ;;
+esac
+
+sed -i "s/vga=[^ ]*/$MODE/" "$CFG"
+echo $1 > $FB_RES
+echo "Set resolution: $1 (restart required before changes take affect)"
