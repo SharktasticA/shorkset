@@ -74,17 +74,6 @@ void applyFontColTtys(char *ansi)
     }
 }
 
-/**
- * Applies the given PSF font using setfont.
- * @param fontPath Path to PSF font
- */
-void applyFontPSF(char *fontPath)
-{
-    char cmd[PATH_MAX + 9];
-    snprintf(cmd, sizeof(cmd), "setfont %s", fontPath);
-    system(cmd);
-}
-
 /** 
  * Gets the current resolution in SHORK's bootloader configuration file.
  */
@@ -153,8 +142,8 @@ void loadConf(void)
     FILE *stream = fopen(DOT_CONF, "r");
     if (stream)
     {
-        // Buffer size has to be PATH_MAX for FONT_PSF, and +15 to take into
-        // account the variable and null terminator
+        // Buffer size has to be PATH_MAX for FONT_PSF and KEYMAP, and +15 to
+        // take into account the variable and null terminator
         char buffer[PATH_MAX + 15];
         while (fgets(buffer, sizeof(buffer), stream))
         {
@@ -180,6 +169,8 @@ void loadConf(void)
                 snprintf(CONFIG.fontColANSI, sizeof(CONFIG.fontColANSI), "%s", value);
             else if (strncmp(buffer, "FONT_PSF=", 9) == 0)
                 snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "%s", value);
+            else if (strncmp(buffer, "KEYMAP=", 7) == 0)
+                snprintf(CONFIG.keymap, sizeof(CONFIG.keymap), "%s", value);
         }
         fclose(stream);
     }
@@ -228,6 +219,44 @@ int loadConFonts(void)
 
     qsort(CONFONTS, CONFONTS_COUNT, PATH_MAX, natCmp);
     return CONFONTS_COUNT > 0;
+}
+
+/**
+ * Loads the contents of the KEYMAPS_DIR directory.
+ * @return 1 if KEYMAPS_DIR exists and not empty; 0 if doesn't exist or is
+ *         empty
+ */
+int loadKeymaps(void)
+{
+    struct stat st;
+    if (stat(KEYMAPS_DIR, &st) != 0 || !S_ISDIR(st.st_mode))
+        return 0;
+
+    DIR *dir = opendir(KEYMAPS_DIR);
+    if (!dir)
+    {
+        size_t extMsgLen = 48 + strlen(KEYMAPS_DIR);
+        EXIT_MSG = malloc(extMsgLen);
+        snprintf(EXIT_MSG, extMsgLen, "ERROR: could not access %s", KEYMAPS_DIR);
+        exit(1);
+    }
+
+    KEYMAPS_COUNT = 0;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (entry->d_name[0] == '.')
+            continue;
+        if (KEYMAPS_COUNT >= MAX_FONTS)
+            break;
+            
+        snprintf(KEYMAPS[KEYMAPS_COUNT], PATH_MAX, "%s/%s", KEYMAPS_DIR, entry->d_name);
+        KEYMAPS_COUNT++;
+    }
+    closedir(dir);
+
+    qsort(KEYMAPS, KEYMAPS_COUNT, PATH_MAX, natCmp);
+    return KEYMAPS_COUNT > 0;
 }
 
 /**
@@ -368,7 +397,9 @@ void saveFontPSF(MenuItem itm)
     }
     else
     {
-        applyFontPSF(itm.payload);
+        char cmd[PATH_MAX + 9];
+        snprintf(cmd, sizeof(cmd), "setfont %s", itm.payload);
+        system(cmd);
         setupViewport();
 
         snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "%s", itm.payload);
@@ -387,6 +418,26 @@ void saveFontPSF(MenuItem itm)
         formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
         printGenericScreen(msgTitle, msgBody);
     }
+}
+
+/**
+ * Saves the keyboard layout to shorkset.conf and applies it.
+ * @param itm Selected keyboard layout's menu item
+ */
+void saveKeymap(MenuItem itm)
+{   
+    char cmd[PATH_MAX + 12];
+    snprintf(cmd, sizeof(cmd), "loadkmap < %s", itm.payload);
+    system(cmd);
+
+    snprintf(CONFIG.keymap, sizeof(CONFIG.keymap), "%s", itm.id);
+    writeConf();
+
+    char msgTitle[80];
+    snprintf(msgTitle, 80, "%s", itm.name);
+    char msgBody[320] = "The selected keyboard layout has been applied.";
+    formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+    printGenericScreen(msgTitle, msgBody);
 }
 
 /**
@@ -681,7 +732,7 @@ void showFontPSFMenu(void)
         if (fullRedraw)
         {
             clearScreen();
-            printHeader(CONFIG.fontPSF);
+            printHeader("Select font (PSF)");
             printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
@@ -757,7 +808,7 @@ void showHelp(void)
 {
     TERM_SIZE = getTerminalSize();
 
-    char desc[150] = "A settings program for changing a SHORK Operating System's display resolution, the terminal's PSF font, and the terminal's font colour.\n";
+    char desc[180] = "A settings program for changing a SHORK Operating System's display resolution, keyboard layout (keymap), the terminal's PSF font, and the terminal's font colour.\n";
     formatNewLines(desc, TERM_SIZE.ws_col, NULL, 0);
     printf("%s\n", desc);
 
@@ -772,6 +823,139 @@ void showHelp(void)
     char version[100] = "-v, --version  Displays version number and exits\n";
     formatNewLines(version, TERM_SIZE.ws_col, "               ", 0);
     printf("%s", version);
+}
+
+/**
+ * Displays keyboard layout selection menu
+ */
+void showKeymapMenu(void)
+{
+    MenuItem menu[MAX_KEYMAPS + 1];
+    int menuSize = 0;
+    for(int i = 0; i < KEYMAPS_COUNT; i++)
+    {
+        char *base = basename(KEYMAPS[i]);
+
+        // Strip extension
+        char nameStr[129];
+        strncpy(nameStr, base, 128);
+        nameStr[128] = '\0';
+        char *dot = strrchr(nameStr, '.');
+        if (dot)
+        {
+            *dot = '\0';
+            dot = strrchr(nameStr, '.');
+            if (dot && (strcmp(dot, ".kmap") == 0 || strcmp(dot, ".bin") == 0))
+                *dot = '\0';
+        }
+
+        // Trim to 100 chars and add "..." if needed
+        if (strlen(nameStr) > 100)
+        {
+            nameStr[100] = '\0';
+            strcat(nameStr, "...");
+        }
+
+        // Add font
+        snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s", nameStr);
+        snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
+        snprintf(menu[menuSize].payload, sizeof(menu[menuSize].payload), "%s", KEYMAPS[i]);
+        menu[menuSize].action = NULL;
+        menu[menuSize].visible = 1;
+        menuSize++;
+    }
+
+    int running = 1;
+    int cursor = 1;
+    int cursorPrev = 0;
+    int fullRedraw = 1;
+
+    // Mark the current colour
+    for (int i = 0; i < menuSize; i++)
+    {
+        if (strcmp(menu[i].id, CONFIG.keymap) == 0)
+        {
+            strcat(menu[i].name, "*");
+            cursor = i + 1;
+            break;
+        }
+    }
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Select keyboard layout");
+            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorPrev = cursor;
+                cursor--;
+                if (cursor < 1) cursor = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorPrev = cursor;
+                cursor++;
+                if (cursor > menuSize) cursor = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                clearScreen();
+                saveKeymap(menu[cursor - 1]);
+                // Update marked item
+                for (int i = 0; i < menuSize; i++)
+                {
+                    size_t len = strlen(menu[i].name);
+                    if (strcmp(menu[i].id, CONFIG.keymap) == 0)
+                    {
+                        // Add "*" only if not already present
+                        if (len == 0 || menu[i].name[len - 1] != '*')
+                        {
+                            strcat(menu[i].name, "*");
+                            cursor = i + 1;
+                        }
+                    }
+                    else
+                    {
+                        // Remove trailing "*" if present
+                        if (len > 0 && menu[i].name[len - 1] == '*')
+                            menu[i].name[len - 1] = '\0';
+                    }
+                }
+                fullRedraw = 1;
+                break;
+        
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+        }
+    }
+
+    clearScreen();
 }
 
 /**
@@ -794,6 +978,7 @@ void showMainMenu(void)
 
     MenuItem rawMenu[] = {
         { "res",    "Display resolution",   "", showDispResMenu,    1               },
+        { "kmp",    "Keyboard layout",      "", showKeymapMenu,     loadKeymaps()   },
         { "psf",    "Font (PSF)",           "", showFontPSFMenu,    loadConFonts()  },
         { "col",    "Font colour",          "", showFontColMenu,    1               }
     };
@@ -886,5 +1071,6 @@ void writeConf(void)
     fprintf(stream, "FONT_COL_NAME=\"%s\"\n", CONFIG.fontColName);
     fprintf(stream, "FONT_COL_ANSI=\"%s\"\n", CONFIG.fontColANSI);
     fprintf(stream, "FONT_PSF=\"%s\"\n", CONFIG.fontPSF);
+    fprintf(stream, "KEYMAP=\"%s\"\n", CONFIG.keymap);
     fclose(stream);
 }

@@ -2,8 +2,7 @@
     ######################################################
     ##             SHORK UTILITY - SHORKSET             ##
     ######################################################
-    ## A utility for changing a SHORK Operating         ##
-    ## System's VGA or VESA display resolution          ##
+    ## A settings program for SHORK Operating Systems   ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
