@@ -50,6 +50,7 @@ void saveDispRes(MenuItem);
 void saveFontCol(MenuItem);
 void showDispResMenu(void);
 void showFontColMenu(void);
+void showHelp(void);
 void showMainMenu(void);
 void writeConf(void);
 

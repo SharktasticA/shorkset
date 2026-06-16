@@ -529,6 +529,27 @@ void showFontColMenu(void)
     clearScreen();
 }
 
+void showHelp(void)
+{
+    TERM_SIZE = getTerminalSize();
+
+    char desc[150] = "A settings program for changing a SHORK Operating System's display resolution, the terminal's PSF font, and the terminal's font colour.\n";
+    formatNewLines(desc, TERM_SIZE.ws_col, NULL, 0);
+    printf("%s\n", desc);
+
+    char usage[50] = "Usage: shorkset [OPTIONS]\n\n";
+    formatNewLines(usage, TERM_SIZE.ws_col, NULL, 0);
+    printf("%s", usage);
+
+    char help[70] = "-h, --help     Displays help information and exits\n";
+    formatNewLines(help, TERM_SIZE.ws_col, "               ", 0);
+    printf("%s", help);
+
+    char version[100] = "-v, --version  Displays version number and exits\n";
+    formatNewLines(version, TERM_SIZE.ws_col, "               ", 0);
+    printf("%s", version);
+}
+
 /**
  * Displays SHORKSET' main menu
  */
