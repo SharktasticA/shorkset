@@ -808,7 +808,7 @@ void showHelp(void)
 {
     TERM_SIZE = getTerminalSize();
 
-    char desc[180] = "A settings program for changing a SHORK Operating System's display resolution, keyboard layout (keymap), the terminal's PSF font, and the terminal's font colour.\n";
+    char desc[140] = "A settings program for changing the display resolution, keyboard layout (keymap), terminal PSF font, and terminal font colour.\n";
     formatNewLines(desc, TERM_SIZE.ws_col, NULL, 0);
     printf("%s\n", desc);
 
