@@ -32,6 +32,8 @@ typedef struct {
     char fontPSF[PATH_MAX];
     // Keyboard layout (keymap) path (default: "en_us")
     char keymap[PATH_MAX];
+    // System volume (default: 25)
+    int volume;
 } Config;
 
 
