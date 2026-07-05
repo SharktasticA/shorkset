@@ -32,7 +32,7 @@ typedef struct {
     char fontPSF[PATH_MAX];
     // Keyboard layout (keymap) path (default: "en_us")
     char keymap[PATH_MAX];
-    // System volume (default: 25)
+    // System volume (default: 40)
     int volume;
 } Config;
 
@@ -46,7 +46,7 @@ static const char *CFG_PATHS[] = {
     "/boot/syslinux/syslinux.cfg"
 };
 static const int CFG_PATHS_LEN = sizeof(CFG_PATHS) / sizeof(CFG_PATHS[0]);
-static Config CONFIG = { 3840, "white", "0;37", "default", "en_us" };
+extern Config CONFIG;
 static char CONFONTS[MAX_FONTS][PATH_MAX];
 static int CONFONTS_COUNT = 0;
 static const char *CONFONTS_DIR = "/usr/share/consolefonts";
@@ -57,7 +57,9 @@ static const char *KEYMAPS_DIR = "/usr/share/keymaps";
 
 void applyFontColFiles(char*);
 void applyFontColTtys(char*);
+void applyVolume(int);
 void getCurrRes(void);
+int getHWVolume(int);
 void loadConf(void);
 int loadConFonts(void);
 int loadKeymaps(void);
@@ -65,12 +67,14 @@ void saveDispRes(MenuItem, int);
 void saveFontCol(MenuItem);
 void saveFontPSF(MenuItem);
 void saveKeymap(MenuItem);
+void saveVolume(MenuItem);
 void showDispResMenu(void);
 void showFontColMenu(void);
 void showFontPSFMenu(void);
 void showHelp(void);
 void showKeymapMenu(void);
 void showMainMenu(void);
+void showVolumeMenu(void);
 void writeConf(void);
 
 #endif

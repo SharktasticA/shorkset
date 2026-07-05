@@ -20,6 +20,8 @@
 #include <sys/ioctl.h>
 #include <libgen.h>
 #include <linux/limits.h>
+#include <math.h>
+#include <linux/soundcard.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,8 +30,12 @@
 
 
 
+Config CONFIG = { 3840, "white", "0;37", "default", "en_us", 40 };
+
+
+
 /**
- * Apply the selected colour to core system files
+ * Applies the selected colour to core system files
  * @param ascii Selected colour's ANSI escape code value
  */
 void applyFontColFiles(char *ansi)
@@ -53,7 +59,7 @@ void applyFontColFiles(char *ansi)
 }
 
 /**
- * Apply the selected colour to all virtual terminals
+ * Applies the selected colour to all virtual terminals
  * @param ascii Selected colour's ANSI escape code value
  */
 void applyFontColTtys(char *ansi)
@@ -71,6 +77,36 @@ void applyFontColTtys(char *ansi)
 
         dprintf(tty, "\033[%sm", ansi);
         close(tty);
+    }
+}
+
+/**
+ * Applies the select volume level to /dev/mixer
+ * @param level 
+ */
+void applyVolume(int level)
+{
+    level = getHWVolume(level);
+    int mixerFD = open("/dev/mixer", O_WRONLY);
+    if (mixerFD >= 0)
+    {
+        int vol = (level << 8) | level;
+        if (ioctl(mixerFD, SOUND_MIXER_WRITE_VOLUME, &vol) < 0)
+        {
+            EXIT_MSG = strdup("ERROR: I/O error with SOUND_MIXER_WRITE_VOLUME when trying to apply new volume level");
+            exit(1);
+        }
+        if (ioctl(mixerFD, SOUND_MIXER_WRITE_PCM, &vol) < 0)
+        {
+            EXIT_MSG = strdup("ERROR: I/O error with SOUND_MIXER_WRITE_PCM when trying to apply new volume level");
+            exit(1);
+        }
+        close(mixerFD);
+    }
+    else
+    {
+        EXIT_MSG = strdup("ERROR: could not open /dev/mixer when trying to apply new volume level");
+        exit(1);
     }
 }
 
@@ -95,7 +131,7 @@ void getCurrRes(void)
     // If no cfg found, time to exit...
     if (!cfg)
     {
-        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file was found\n");
+        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file was found");
         exit(1);
     }
 
@@ -103,7 +139,7 @@ void getCurrRes(void)
     FILE *stream = fopen(cfg, "r");
     if (!stream)
     {
-        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration file\n");
+        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration file");
         exit(1);
     }
 
@@ -129,9 +165,28 @@ void getCurrRes(void)
     // Catch if unsuccessful
     if (CONFIG.dispRes == -1)
     {
-        EXIT_MSG = strdup("ERROR: unable to determine the current resolution from bootloader configuration file\n");
+        EXIT_MSG = strdup("ERROR: unable to determine the current resolution from bootloader configuration file");
         exit(1);
     }
+}
+
+/**
+ * Converts a human-readible volume percent (0-100%) to a value the OSS API
+ * expects. 
+ * @param pct Human-readible volume percentage (0-100)
+ * @return Logarithmic volume level for OSS API
+ */
+int getHWVolume(int pct)
+{
+    if (pct <= 0)
+        return 0;
+    if (pct > 100)
+        return 100;
+
+    double hw = 100.0 + 12.5 * log2(pct / 100.0);
+    if (hw < 50)
+        hw = 50;
+    return (int)(hw + 0.5);
 }
 
 /**
@@ -282,7 +337,7 @@ void saveDispRes(MenuItem itm, int skipMsg)
     // If no cfg found, time to exit...
     if (!cfg)
     {
-        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file was found\n");
+        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file was found");
         exit(1);
     }
 
@@ -290,7 +345,7 @@ void saveDispRes(MenuItem itm, int skipMsg)
     FILE *stream = fopen(cfg, "r");
     if (!stream)
     {
-        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration file\n");
+        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration file");
         exit(1);
     }
 
@@ -309,7 +364,7 @@ void saveDispRes(MenuItem itm, int skipMsg)
     char *vgaNeedle = strstr(buffer, "vga=");
     if (!vgaNeedle)
     {
-        EXIT_MSG = strdup("ERROR: bootloader configuration missing the \"vga\" kernel parameter\n");
+        EXIT_MSG = strdup("ERROR: bootloader configuration missing the \"vga\" kernel parameter");
         free(buffer);
         exit(1);
     }
@@ -336,7 +391,7 @@ void saveDispRes(MenuItem itm, int skipMsg)
     stream = fopen(cfg, "w");
     if (!stream)
     {
-        EXIT_MSG = strdup("ERROR: failed to write bootloader configuration file\n");
+        EXIT_MSG = strdup("ERROR: failed to write bootloader configuration file");
         free(result);
         exit(1);
     }
@@ -440,6 +495,23 @@ void saveKeymap(MenuItem itm)
     char msgBody[320] = "The selected keyboard layout has been applied.";
     int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
     printTextScreen(msgTitle, msgBody, lines, 1);
+}
+
+/**
+ * Saves the selected volume level to shorkset.conf and applies it.
+ * @param itm Selected volume level's menu item
+ */
+void saveVolume(MenuItem itm)
+{
+    CONFIG.volume = atoi(itm.name);
+    applyVolume(CONFIG.volume);
+    writeConf();
+
+    /*char msgTitle[80];
+    snprintf(msgTitle, 80, "%s", itm.name);
+    char msgBody[320] = "The selected volume level has been applied.";
+    int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+    printTextScreen(msgTitle, msgBody, lines, 1);*/
 }
 
 /**
@@ -817,7 +889,7 @@ void showHelp(void)
 {
     TERM_SIZE = getTerminalSize();
 
-    char desc[140] = "A settings program for changing the display resolution, keyboard layout (keymap), terminal PSF font, and terminal font colour.\n";
+    char desc[160] = "A settings program for changing the display resolution, keyboard layout (keymap), system sound volume, terminal PSF font, and terminal font colour.\n";
     formatNewLines(desc, TERM_SIZE.ws_col, NULL, 0);
     printf("%s\n", desc);
 
@@ -832,6 +904,13 @@ void showHelp(void)
     char version[100] = "-v, --version  Displays version number and exits\n";
     formatNewLines(version, TERM_SIZE.ws_col, "               ", 0);
     printf("%s", version);
+
+    if (access("/dev/dsp", F_OK) == 0)
+    {
+        char volume[110] = "-vl, --volume  Set a volume level between 0 and 100; no assignment returns the current level\n";
+        formatNewLines(volume, TERM_SIZE.ws_col, "               ", 0);
+        printf("%s", volume);
+    }
 }
 
 /**
@@ -989,10 +1068,11 @@ void showMainMenu(void)
     getCurrRes();
 
     MenuItem rawMenu[] = {
-        { "res",    "Display resolution",   "", showDispResMenu,    1               },
-        { "kmp",    "Keyboard layout",      "", showKeymapMenu,     loadKeymaps()   },
-        { "psf",    "Font (PSF)",           "", showFontPSFMenu,    loadConFonts()  },
-        { "col",    "Font colour",          "", showFontColMenu,    1               }
+        { "res",    "Display resolution",   "", showDispResMenu,    1                               },
+        { "kmp",    "Keyboard layout",      "", showKeymapMenu,     loadKeymaps()                   },
+        { "psf",    "Font (PSF)",           "", showFontPSFMenu,    loadConFonts()                  },
+        { "col",    "Font colour",          "", showFontColMenu,    1                               },
+        { "vol",    "Volume",               "", showVolumeMenu,     access("/dev/dsp", F_OK) == 0   }
     };
     int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
 
@@ -1051,6 +1131,124 @@ void showMainMenu(void)
             case ENTER:
                 clearScreen();
                 menu[cursorY - 1].action();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
+/**
+ * Displays System volume selection menu
+ */
+void showVolumeMenu(void)
+{
+    MenuItem menu[] = {
+        { "0",      "0",    "", NULL,   1   },
+        { "10",     "10",   "", NULL,   1   },
+        { "20",     "20",   "", NULL,   1   },
+        { "30",     "30",   "", NULL,   1   },
+        { "40",     "40",   "", NULL,   1   },
+        { "50",     "50",   "", NULL,   1   },
+        { "60",     "60",   "", NULL,   1   },
+        { "70",     "70",   "", NULL,   1   },
+        { "80",     "80",   "", NULL,   1   },
+        { "90",     "90",   "", NULL,   1   },
+        { "100",    "100",  "", NULL,   1   }
+    };
+    int menuSize = sizeof(menu) / sizeof(menu[0]);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    // Mark the current volume
+    char vol[12];
+    snprintf(vol, 12, "%d", CONFIG.volume);
+    for (int i = 0; i < menuSize; i++)
+    {
+        if (strcmp(menu[i].id, vol) == 0)
+        {
+            strcat(menu[i].name, "*");
+            cursorY = i + 1;
+            break;
+        }
+    }
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Select volume");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                clearScreen();
+                saveVolume(menu[cursorY - 1]);
+                // Update marked item
+                snprintf(vol, 12, "%d", CONFIG.volume);
+                for (int i = 0; i < menuSize; i++)
+                {
+                    size_t len = strlen(menu[i].name);
+                    if (strcmp(menu[i].id, vol) == 0)
+                    {
+                        // Add "*" only if not already present
+                        if (len == 0 || menu[i].name[len - 1] != '*')
+                        {
+                            strcat(menu[i].name, "*");
+                            cursorY = i + 1;
+                        }
+                    }
+                    else
+                    {
+                        // Remove trailing "*" if present
+                        if (len > 0 && menu[i].name[len - 1] == '*')
+                            menu[i].name[len - 1] = '\0';
+                    }
+                }
                 fullRedraw = 1;
                 break;
 
