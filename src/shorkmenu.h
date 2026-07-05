@@ -2,7 +2,8 @@
     ######################################################
     ##                  SHORK UTILITY                   ##
     ######################################################
-    ## An interactive menu system for SHORK UTILITIES   ##
+    ## An interactive menu system for SHORK UTILITIES & ##
+    ## SHORK ENTERTAINMENT                              ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -33,11 +34,12 @@ typedef enum
 
 typedef struct 
 {
-    char id[128];
-    char name[128];
-    char payload[PATH_MAX];
+    char id[80];
+    char name[80];
+    char *payload;
     void (*action)(void);
-    int visible;
+    int isVisible;
+    int isStatic;
 } MenuItem;
 
 
@@ -52,10 +54,12 @@ extern char *COL_FOR_CODE;
 extern char *COL_FOR_CURSOR;
 extern char *COL_FOR_HEADING;
 extern char *COL_FOR_OL;
+extern char *COL_FOR_SHORKUTIL;
 extern int COMPACT;
 extern char CURSOR_CHAR;
 extern char *EXIT_MSG;
 extern struct termios OLD_TERMIOS;
+extern char SEPARATOR;
 extern struct winsize TERM_SIZE;
 
 
@@ -64,15 +68,17 @@ void awaitInput(void);
 void clearScreen(void);
 void disableRawMode(void);
 void enableRawMode(void);
+void freeMenu(MenuItem*, int);
+int getIntInput(char*, int, int, int);
 NavInput getNavInput(void);
 void onExit(void);
 void onSigInt(int);
 void printDir(struct dirent**, int, int, int);
 void printFooter(char*);
-void printGenericScreen(char*, char*);
 void printHeader(char*);
-void printMenu(MenuItem*, int, int, int, int, int, int, int, int);
-void printScrollingText(char*, int, int);
+void printMenu(MenuItem*, int, char*, int, int, int, int*, int*, int*, int*);
+void printTextScreen(char*, char*, int, int);
+int printYesNoScreen(char*, char*);
 int rowsInCol(int, int, int);
 void setupMenuSys(void);
 void setupViewport(void);

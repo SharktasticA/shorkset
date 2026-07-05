@@ -1,9 +1,9 @@
 /*
     ######################################################
-    ##             SHORK UTILITY - SHORKSET             ##
+    ##                  SHORK UTILITY                   ##
     ######################################################
-    ## General, utility functions to be used throughout ##
-    ## SHORKSET                                         ##
+    ## General, utility functions for SHORK Utilities & ##
+    ## SHORK ENTERTAINMENT                              ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -33,17 +33,21 @@ typedef struct {
 
 
 char *bytesToReadable(const char *, const long long);
+char *captureProgramOutput(const char *, const size_t);
 char *extractFromPoint(char *, size_t, char, int);
+int fileExists(const char*);
 char *findErase(const char *, const size_t, const char *);
 char *findReplace(const char *, const size_t, const char *, const char *);
 int formatNewLines(char *, int, char *, int);
 float fSqrt(float);
-int getIntInput(char*, int, int, int);
+char *getBinDir(void);
 Process getParentProcess(int);
 struct winsize getTerminalSize(void);
 int isFileExecutable(char*, struct dirent*);
 int isProgramInstalled(char*, int);
 int iSqrt(int);
+void limitLines(char*, const int);
+int loadCSVLine(char*, char *[], int);
 int natCmp(const void*, const void*);
 int procExists(const char *, const int);
 int readHexFile(const char *);

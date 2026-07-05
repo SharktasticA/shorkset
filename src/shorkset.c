@@ -171,6 +171,8 @@ void loadConf(void)
                 snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "%s", value);
             else if (strncmp(buffer, "KEYMAP=", 7) == 0)
                 snprintf(CONFIG.keymap, sizeof(CONFIG.keymap), "%s", value);
+            else if (strncmp(buffer, "VOLUME=", 7) == 0)
+                CONFIG.volume = atoi(value);
         }
         fclose(stream);
     }
@@ -354,8 +356,8 @@ void saveDispRes(MenuItem itm, int skipMsg)
         char msgTitle[80];
         snprintf(msgTitle, 80, "%s", itm.name);
         char msgBody[320] = "The selected display resolution has been saved. If you selected a VGA resolution and had selected a PSF font before, the latter setting will now be discarded as PSF fonts dictate their own VGA resolution. A system restart is required before the changes will take effect.";
-        formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-        printGenericScreen(msgTitle, msgBody);
+        int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+        printTextScreen(msgTitle, msgBody, lines, 1);
     }
 }
 
@@ -375,8 +377,8 @@ void saveFontCol(MenuItem itm)
     char msgTitle[80];
     snprintf(msgTitle, 80, "%s", itm.payload);
     char msgBody[320] = "The selected font colour has been saved and will be applied once you exit SHORKSET. If there are any other active virtual terminals (ttyX), you may need to enter \"exit\" when convenient, or restart your computer before this change will take complete effect.";
-    formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-    printGenericScreen(msgTitle, msgBody);
+    int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+    printTextScreen(msgTitle, msgBody, lines, 1);
 }
 
 /**
@@ -392,8 +394,8 @@ void saveFontPSF(MenuItem itm)
         
         char msgTitle[80] = "default";
         char msgBody[320] = "The PSF font will be reset to default. If a PSF font other than \"default\" was previously selected, you must restart your computer before this change will take effect.";
-        formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-        printGenericScreen(msgTitle, msgBody);
+        int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+        printTextScreen(msgTitle, msgBody, lines, 1);
     }
     else
     {
@@ -415,8 +417,8 @@ void saveFontPSF(MenuItem itm)
         char msgTitle[80];
         snprintf(msgTitle, 80, "%s", itm.name);
         char msgBody[320] = "The selected PSF font has been saved and will be applied once you exit SHORKSET. If you had selected a VGA display resolution before, that setting will now be discarded as the PSF font will dictate its own VGA resolution. VBE display resolutions are unaffected.";
-        formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-        printGenericScreen(msgTitle, msgBody);
+        int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+        printTextScreen(msgTitle, msgBody, lines, 1);
     }
 }
 
@@ -436,8 +438,8 @@ void saveKeymap(MenuItem itm)
     char msgTitle[80];
     snprintf(msgTitle, 80, "%s", itm.name);
     char msgBody[320] = "The selected keyboard layout has been applied.";
-    formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-    printGenericScreen(msgTitle, msgBody);
+    int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
+    printTextScreen(msgTitle, msgBody, lines, 1);
 }
 
 /**
@@ -446,27 +448,29 @@ void saveKeymap(MenuItem itm)
 void showDispResMenu(void)
 {
     MenuItem menu[] = {
-        { "3840",   "VGA: 80x25",               "", NULL,   1 },
-        { "3843",   "VGA: 80x28",               "", NULL,   1 },
-        { "3846",   "VGA: 80x34",               "", NULL,   1 },
-        { "3842",   "VGA: 80x43",               "", NULL,   1 },
-        { "3841",   "VGA: 80x50",               "", NULL,   1 },
-        { "3847",   "VGA: 80x60",               "", NULL,   1 },
+        { "3840",   "VGA: 80x25", NULL, NULL, 1, 0 },
+        { "3843",   "VGA: 80x28", NULL, NULL, 1, 0 },
+        { "3846",   "VGA: 80x34", NULL, NULL, 1, 0 },
+        { "3842",   "VGA: 80x43", NULL, NULL, 1, 0 },
+        { "3841",   "VGA: 80x50", NULL, NULL, 1, 0 },
+        { "3847",   "VGA: 80x60", NULL, NULL, 1, 0 },
 #ifdef FB
-        { "782",    "VBE: 320x200 (CGA)",       "", NULL,   1 },
-        { "785",    "VBE: 640x480 (VGA)",       "", NULL,   1 },
-        { "788",    "VBE: 800x600 (SVGA)",      "", NULL,   1 },
-        { "791",    "VBE: 1024x768 (XGA)",      "", NULL,   1 },
-        { "794",    "VBE: 1280x1024 (SXGA)",    "", NULL,   1 },
-        { "837",    "VBE: 1400x1050 (SXGA+)",   "", NULL,   1 },
-        { "838",    "VBE: 1600x1200 (UXGA)",    "", NULL,   1 },
+        { "782",    "VBE: 320x200 (CGA)", NULL, NULL, 1, 0 },
+        { "785",    "VBE: 640x480 (VGA)", NULL, NULL, 1, 0 },
+        { "788",    "VBE: 800x600 (SVGA)", NULL, NULL, 1, 0 },
+        { "791",    "VBE: 1024x768 (XGA)", NULL, NULL, 1, 0 },
+        { "794",    "VBE: 1280x1024 (SXGA)" ,NULL, NULL, 1, 0 },
+        { "837",    "VBE: 1400x1050 (SXGA+)", NULL, NULL, 1, 0 },
+        { "838",    "VBE: 1600x1200 (UXGA)", NULL, NULL, 1, 0 }
 #endif
     };
     int menuSize = sizeof(menu) / sizeof(menu[0]);
 
     int running = 1;
-    int cursor = 1;
-    int cursorPrev = 0;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
     int fullRedraw = 1;
 
     // Mark the current resolution
@@ -475,7 +479,7 @@ void showDispResMenu(void)
         if (atoi(menu[i].id) == CONFIG.dispRes)
         {
             strcat(menu[i].name, "*");
-            cursor = i + 1;
+            cursorY = i + 1;
             break;
         }
     }
@@ -486,7 +490,7 @@ void showDispResMenu(void)
         {
             clearScreen();
             printHeader("Select display resolution");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
         else
@@ -495,32 +499,32 @@ void showDispResMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
 
         fullRedraw = 1;
-        cursorPrev = 0;
+        cursorYPrev = 0;
         switch (input)
         {
             case CURSOR_UP:
-                cursorPrev = cursor;
-                cursor--;
-                if (cursor < 1) cursor = menuSize;
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
-                cursorPrev = cursor;
-                cursor++;
-                if (cursor > menuSize) cursor = 1;
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
                 fullRedraw = 0;
                 break;
 
             case ENTER:
                 clearScreen();
-                saveDispRes(menu[cursor - 1], 0);
+                saveDispRes(menu[cursorY - 1], 0);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
@@ -531,7 +535,7 @@ void showDispResMenu(void)
                         if (len == 0 || menu[i].name[len - 1] != '*')
                         {
                             strcat(menu[i].name, "*");
-                            cursor = i + 1;
+                            cursorY = i + 1;
                         }
                     }
                     else
@@ -582,8 +586,10 @@ void showFontColMenu(void)
     int menuSize = sizeof(menu) / sizeof(menu[0]);
 
     int running = 1;
-    int cursor = 1;
-    int cursorPrev = 0;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
     int fullRedraw = 1;
 
     // Mark the current colour
@@ -592,7 +598,7 @@ void showFontColMenu(void)
         if (strcmp(menu[i].payload, CONFIG.fontColName) == 0)
         {
             strcat(menu[i].name, "*");
-            cursor = i + 1;
+            cursorY = i + 1;
             break;
         }
     }
@@ -603,7 +609,7 @@ void showFontColMenu(void)
         {
             clearScreen();
             printHeader("Select font colour");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
         else
@@ -612,32 +618,32 @@ void showFontColMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
 
         fullRedraw = 1;
-        cursorPrev = 0;
+        cursorYPrev = 0;
         switch (input)
         {
             case CURSOR_UP:
-                cursorPrev = cursor;
-                cursor--;
-                if (cursor < 1) cursor = menuSize;
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
-                cursorPrev = cursor;
-                cursor++;
-                if (cursor > menuSize) cursor = 1;
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
                 fullRedraw = 0;
                 break;
 
             case ENTER:
                 clearScreen();
-                saveFontCol(menu[cursor - 1]);
+                saveFontCol(menu[cursorY - 1]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
@@ -648,7 +654,7 @@ void showFontColMenu(void)
                         if (len == 0 || menu[i].name[len - 1] != '*')
                         {
                             strcat(menu[i].name, "*");
-                            cursor = i + 1;
+                            cursorY = i + 1;
                         }
                     }
                     else
@@ -707,13 +713,16 @@ void showFontPSFMenu(void)
         snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
         snprintf(menu[menuSize].payload, sizeof(menu[menuSize].payload), "%s", CONFONTS[i]);
         menu[menuSize].action = NULL;
-        menu[menuSize].visible = 1;
+        menu[menuSize].isVisible = 1;
+        menu[menuSize].isStatic = 0;
         menuSize++;
     }
 
     int running = 1;
-    int cursor = 1;
-    int cursorPrev = 0;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
     int fullRedraw = 1;
 
     // Mark the current colour
@@ -722,7 +731,7 @@ void showFontPSFMenu(void)
         if (strcmp(menu[i].payload, CONFIG.fontPSF) == 0)
         {
             strcat(menu[i].name, "*");
-            cursor = i + 1;
+            cursorY = i + 1;
             break;
         }
     }
@@ -733,7 +742,7 @@ void showFontPSFMenu(void)
         {
             clearScreen();
             printHeader("Select font (PSF)");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
         else
@@ -742,32 +751,32 @@ void showFontPSFMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
 
         fullRedraw = 1;
-        cursorPrev = 0;
+        cursorYPrev = 0;
         switch (input)
         {
             case CURSOR_UP:
-                cursorPrev = cursor;
-                cursor--;
-                if (cursor < 1) cursor = menuSize;
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
-                cursorPrev = cursor;
-                cursor++;
-                if (cursor > menuSize) cursor = 1;
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
                 fullRedraw = 0;
                 break;
 
             case ENTER:
                 clearScreen();
-                saveFontPSF(menu[cursor - 1]);
+                saveFontPSF(menu[cursorY - 1]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
@@ -778,7 +787,7 @@ void showFontPSFMenu(void)
                         if (len == 0 || menu[i].name[len - 1] != '*')
                         {
                             strcat(menu[i].name, "*");
-                            cursor = i + 1;
+                            cursorY = i + 1;
                         }
                     }
                     else
@@ -861,13 +870,16 @@ void showKeymapMenu(void)
         snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
         snprintf(menu[menuSize].payload, sizeof(menu[menuSize].payload), "%s", KEYMAPS[i]);
         menu[menuSize].action = NULL;
-        menu[menuSize].visible = 1;
+        menu[menuSize].isVisible = 1;
+        menu[menuSize].isStatic = 0;
         menuSize++;
     }
 
     int running = 1;
-    int cursor = 1;
-    int cursorPrev = 0;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
     int fullRedraw = 1;
 
     // Mark the current colour
@@ -876,7 +888,7 @@ void showKeymapMenu(void)
         if (strcmp(menu[i].id, CONFIG.keymap) == 0)
         {
             strcat(menu[i].name, "*");
-            cursor = i + 1;
+            cursorY = i + 1;
             break;
         }
     }
@@ -887,7 +899,7 @@ void showKeymapMenu(void)
         {
             clearScreen();
             printHeader("Select keyboard layout");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
         else
@@ -896,32 +908,32 @@ void showKeymapMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
 
         fullRedraw = 1;
-        cursorPrev = 0;
+        cursorYPrev = 0;
         switch (input)
         {
             case CURSOR_UP:
-                cursorPrev = cursor;
-                cursor--;
-                if (cursor < 1) cursor = menuSize;
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
-                cursorPrev = cursor;
-                cursor++;
-                if (cursor > menuSize) cursor = 1;
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
                 fullRedraw = 0;
                 break;
 
             case ENTER:
                 clearScreen();
-                saveKeymap(menu[cursor - 1]);
+                saveKeymap(menu[cursorY - 1]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
@@ -932,7 +944,7 @@ void showKeymapMenu(void)
                         if (len == 0 || menu[i].name[len - 1] != '*')
                         {
                             strcat(menu[i].name, "*");
-                            cursor = i + 1;
+                            cursorY = i + 1;
                         }
                     }
                     else
@@ -988,12 +1000,14 @@ void showMainMenu(void)
     MenuItem menu[rawMenuSize];
     int menuSize = 0;
     for (int i = 0; i < rawMenuSize; i++)
-        if (rawMenu[i].visible)
+        if (rawMenu[i].isVisible)
             menu[menuSize++] = rawMenu[i];
 
     int running = 1;
-    int cursor = 1;
-    int cursorPrev = 0;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
     int fullRedraw = 1;
 
     while (running)
@@ -1002,7 +1016,7 @@ void showMainMenu(void)
         {
             clearScreen();
             printHeader("SHORKSET");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Quit");
         }
         else
@@ -1011,32 +1025,32 @@ void showMainMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, 1, TERM_SIZE.ws_col - 6, menuSize, 1, cursor, 1, cursorPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
 
         fullRedraw = 1;
-        cursorPrev = 0;
+        cursorYPrev = 0;
         switch (input)
         {
             case CURSOR_UP:
-                cursorPrev = cursor;
-                cursor--;
-                if (cursor < 1) cursor = menuSize;
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
-                cursorPrev = cursor;
-                cursor++;
-                if (cursor > menuSize) cursor = 1;
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
                 fullRedraw = 0;
                 break;
 
             case ENTER:
                 clearScreen();
-                menu[cursor - 1].action();
+                menu[cursorY - 1].action();
                 fullRedraw = 1;
                 break;
 
@@ -1072,5 +1086,7 @@ void writeConf(void)
     fprintf(stream, "FONT_COL_ANSI=\"%s\"\n", CONFIG.fontColANSI);
     fprintf(stream, "FONT_PSF=\"%s\"\n", CONFIG.fontPSF);
     fprintf(stream, "KEYMAP=\"%s\"\n", CONFIG.keymap);
+    fprintf(stream, "VOLUME=%d\n", CONFIG.volume);
     fclose(stream);
+    sync();
 }

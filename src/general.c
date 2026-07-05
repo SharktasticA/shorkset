@@ -1,9 +1,9 @@
 /*
     ######################################################
-    ##             SHORK UTILITY - SHORKSET             ##
+    ##                  SHORK UTILITY                   ##
     ######################################################
-    ## General, utility functions to be used throughout ##
-    ## SHORKSET                                         ##
+    ## General, utility functions for SHORK Utilities & ##
+    ## SHORK ENTERTAINMENT                              ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -21,6 +21,7 @@
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <linux/limits.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
@@ -133,6 +134,47 @@ char *bytesToReadable(const char *from, const long long val)
 }
 
 /**
+ * Captures the output of the given program command capped at the given buffer
+ * size.
+ * @param command Program command to run
+ * @param bufferSize The maximum string size
+ * @return char* Captured program output as string
+ */
+char *captureProgramOutput(const char *command, const size_t bufferSize)
+{
+    FILE* stream = popen(command, "r");
+    if (!stream)
+        return NULL;
+
+    char *buffer = malloc(bufferSize);
+    if (!buffer)
+    {
+        pclose(stream);
+        return NULL;
+    }
+
+    size_t len = 0;
+    size_t chunkSize = 256;
+    char tmp[256];
+
+    while (len < bufferSize - 1)
+    {
+        size_t toRead = (bufferSize - 1 - len < chunkSize) ? bufferSize - 1 - len : chunkSize;
+
+        size_t bytesRead = fread(tmp, 1, toRead, stream);
+        if (bytesRead == 0)
+            break;
+
+        memcpy(buffer + len, tmp, bytesRead);
+        len += bytesRead;
+    }
+    pclose(stream);
+
+    buffer[len] = '\0';
+    return buffer;
+}
+
+/**
  * Extracts a substring from an input string after a given separation character
  * and offset. Also removes any surrounding quotes or trailing newline characters
  * present. 
@@ -175,6 +217,22 @@ char *extractFromPoint(char *input, size_t inputSize, char point, int offset)
         result[len - 1] = '\0';
 
     return result;
+}
+
+/**
+ * Checks if a file exists or not.
+ * @param file Full path to file
+ * @return 1 if file found; 0 if not or error
+ */
+int fileExists(const char *file)
+{
+    if (!file || file[0] == '\0')
+        return 0;
+
+    struct stat st;
+    if (stat(file, &st) == 0 && S_ISREG(st.st_mode))
+        return 1;
+    return 0;
 }
 
 /**
@@ -367,68 +425,24 @@ float fSqrt(float x)
     return result;
 }
 
-/**
- * Gets an integer input from the user.
- * @param prompt Prompt to give the user 
- * @param min Minimum allowed input (set to same as max to disable validation)
- * @param max Maximum allowed input (set to same as min to disable validation)
- * @param negativeIfInvalid Flags if function should return -1 if invalid input instead of looping
- * @return User's integer input
+/** 
+ * Returns the full path to the directory this program is stored in.
+ * @return Full path the binary is stored in
  */
-int getIntInput(char *prompt, int min, int max, int negativeIfInvalid)
+char *getBinDir(void)
 {
-    if (min > max) min = max;
-    if (max < min) max = min;
+    // Get binary's full path
+    static char binDir[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", binDir, sizeof(binDir) - 1);
+    if (len <= 0) return NULL;
+    binDir[len] = '\0';
 
-    int isValid;
-    char buffer[32];
-    int val;
+    // Remove filename from path
+    char *slash = strrchr(binDir, '/');
+    if (!slash) return NULL;
+    *(slash + 1) = '\0';
 
-    do
-    {
-        disableRawMode();
-
-        if (COL_ENABLED)
-        {
-            printf("\033[%s;%sm", COL_FOR_BOLD_WHITE, COL_BAK_BLUE);
-            for (int i = 0; i < TERM_SIZE.ws_col; i++) printf(" ");
-            printf("\033[1G");
-        }
-
-        printf("%s", prompt);
-        if (min != max) printf(" (%d-%d)", min, max);
-        printf(": ");
-
-        if (fgets(buffer, sizeof(buffer), stdin) != NULL)
-        {
-            if (sscanf(buffer, "%d", &val) == 1)
-            {
-                if ((min != max) && (val >= min && val <= max))
-                    isValid = 1;
-                else if (min == max)
-                    isValid = 1;
-                else
-                    isValid = 0;
-            }
-            else isValid = 0;
-        }
-        else
-        {
-            int c;
-            while ((c = getchar()) != '\n' && c != EOF);
-            isValid = 0;
-        }
-
-        enableRawMode();
-
-        if (!isValid && negativeIfInvalid)
-            return -1;
-
-    } while (!isValid);
-
-    if (COL_ENABLED) printf("\033[%sm", COL_RESET);
-
-    return val;
+    return binDir;
 }
 
 /**
@@ -499,7 +513,7 @@ int isFileExecutable(char *currPath, struct dirent *entry)
 }
 
 /**
- * @param prog Program's executable name
+ * @param prog Program's executable name or full path
  * @param isExec Flags if the function should also check if a found program has
  *               execute permissions
  * @returns 1 if program is installed; 0 if not
@@ -507,6 +521,10 @@ int isFileExecutable(char *currPath, struct dirent *entry)
 int isProgramInstalled(char *prog, int isExec)
 {
     int mode = isExec ? X_OK : F_OK;
+
+    // If prog contains '/' treat it as a full path
+    if (strchr(prog, '/') != NULL)
+        return (access(prog, mode) == 0);
 
     char *path = getenv("PATH");
     if (!path)
@@ -574,6 +592,73 @@ int iSqrt(int x)
     }
 
     return result;
+}
+
+/**
+ * Reduces a given string to the given maximum lines by counting '\n' escape
+ * codes.
+ * @param str Input string
+ * @param maxLines Number of lines before cutting the string
+ */
+void limitLines(char* str, const int maxLines)
+{
+    if (!str || maxLines <= 0)
+    {
+        if (str)
+            str[0] = '\0';
+        return;
+    }
+
+    int count = 0;
+    for (int i = 0; str[i] != '\0'; i++)
+    {
+        if (str[i] == '\n')
+        {
+            count++;
+            if (count == maxLines)
+            {
+                str[i + 1] = '\0';
+                return;
+            }
+        }
+    }
+}
+
+/**
+ * Parses a line taken from a CSV list into separate fields.
+ * @param line Raw line from CSV file to be processed
+ * @param out Array of separated fields
+ * @param maxFields Max number of fields to look for
+ * @return Number of fields detected
+ */
+int loadCSVLine(char *line, char *out[], int maxFields)
+{
+    int i = 0;
+
+    while (*line && i < maxFields)
+    {
+        out[i++] = line;
+        int inQuotes = 0;
+
+        while (*line)
+        {
+            if (*line == '"')
+            {
+                inQuotes = !inQuotes;
+                if (line[1] == '"') line++;
+            }
+            else if (*line == ',' && !inQuotes)
+            {
+                *line = '\0';
+                line++;
+                break;
+            }
+
+            line++;
+        }
+    }
+
+    return i;
 }
 
 int natCmp(const void *a, const void *b)
