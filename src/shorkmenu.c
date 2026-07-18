@@ -421,7 +421,7 @@ void printMenu(MenuItem *menu, int menuSize, char *msg, int cols, int colWidth, 
     if (menu[(*cursorX + *cursorY) - 2].isStatic)
     {
         // Going up
-        if (*cursorYPrev > 0 && *cursorY < *cursorYPrev && !(*cursorYPrev == rows && *cursorXPrev == cols))
+        if (*cursorYPrev > 0 && *cursorY < *cursorYPrev && !(*cursorYPrev == rows && *cursorXPrev == cols && *cursorY == 1))
         {
             // Decrement the cursor until we reach something non-static
             while (*cursorY > 0 && menu[(*cursorX - 1) * rows + *cursorY - 1].isStatic)

@@ -175,6 +175,29 @@ char *captureProgramOutput(const char *command, const size_t bufferSize)
 }
 
 /**
+ * Counts how many times the given substring is found in the given string.
+ * @param str String to search
+ * @param sub Substring to find
+ * @return Number of sub occurrences in str
+ */
+int countSubstrs(const char *str, const char *sub)
+{
+    size_t len = strlen(sub);
+    if (len == 0)
+        return 0;
+
+    int count = 0;
+    const char *p = str;
+    while ((p = strstr(p, sub)) != NULL)
+    {
+        count++;
+        p += len;
+    }
+
+    return count;
+}
+
+/**
  * Extracts a substring from an input string after a given separation character
  * and offset. Also removes any surrounding quotes or trailing newline characters
  * present. 

@@ -15,6 +15,7 @@
 #include "general.h"
 #include "shorkmenu.h"
 #include "shorkset.h"
+#include "vbe.h"
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -519,24 +520,59 @@ void saveVolume(MenuItem itm)
  */
 void showDispResMenu(void)
 {
-    MenuItem menu[] = {
-        { "3840",   "VGA: 80x25", NULL, NULL, 1, 0 },
-        { "3843",   "VGA: 80x28", NULL, NULL, 1, 0 },
-        { "3846",   "VGA: 80x34", NULL, NULL, 1, 0 },
-        { "3842",   "VGA: 80x43", NULL, NULL, 1, 0 },
-        { "3841",   "VGA: 80x50", NULL, NULL, 1, 0 },
-        { "3847",   "VGA: 80x60", NULL, NULL, 1, 0 },
+    MenuItem rawMenu[] = {
+        { "",       "VGA modes (col x row)", NULL, NULL, 1, 1 },
+        { "3840",   "80x25", NULL, NULL, 1, 0 },
+        { "3843",   "80x28", NULL, NULL, 1, 0 },
+        { "3846",   "80x34", NULL, NULL, 1, 0 },
+        { "3842",   "80x43", NULL, NULL, 1, 0 },
+        { "3841",   "80x50", NULL, NULL, 1, 0 },
+        { "3847",   "80x60", NULL, NULL, 1, 0 },
 #ifdef FB
-        { "782",    "VBE: 320x200 (CGA)", NULL, NULL, 1, 0 },
-        { "785",    "VBE: 640x480 (VGA)", NULL, NULL, 1, 0 },
-        { "788",    "VBE: 800x600 (SVGA)", NULL, NULL, 1, 0 },
-        { "791",    "VBE: 1024x768 (XGA)", NULL, NULL, 1, 0 },
-        { "794",    "VBE: 1280x1024 (SXGA)" ,NULL, NULL, 1, 0 },
-        { "837",    "VBE: 1400x1050 (SXGA+)", NULL, NULL, 1, 0 },
-        { "838",    "VBE: 1600x1200 (UXGA)", NULL, NULL, 1, 0 }
+        { "",       "VBE resolutions (width x height x bits)", NULL, NULL, 1, 1 },
+        { "782",    "320x200x16", NULL, NULL, 1, 0 },
+        { "783",    "320x200x24", NULL, NULL, 1, 0 },
+
+        { "768",    "640x400x8", NULL, NULL, 1, 0 },
+        { "802",    "640x400x16", NULL, NULL, 1, 0 },
+        { "803",    "640x400x24", NULL, NULL, 1, 0 },
+
+        { "769",    "640x480x8", NULL, NULL, 1, 0 },
+        { "785",    "640x480x16", NULL, NULL, 1, 0 },
+        { "786",    "640x480x24", NULL, NULL, 1, 0 },
+
+        { "770",    "800x600x4", NULL, NULL, 1, 0 },
+        { "771",    "800x600x8", NULL, NULL, 1, 0 },
+        { "788",    "800x600x16", NULL, NULL, 1, 0 },
+        { "789",    "800x600x24", NULL, NULL, 1, 0 },
+
+        { "772",    "1024x768x4", NULL, NULL, 1, 0 },
+        { "773",    "1024x768x8", NULL, NULL, 1, 0 },
+        { "791",    "1024x768x16", NULL, NULL, 1, 0 },
+        { "792",    "1024x768x24", NULL, NULL, 1, 0 },
+
+        { "774",    "1280x1024x4", NULL, NULL, 1, 0 },
+        { "775",    "1280x1024x8", NULL, NULL, 1, 0 },
+        { "794",    "1280x1024x16", NULL, NULL, 1, 0 },
+        { "795",    "1280x1024x24", NULL, NULL, 1, 0 }
 #endif
     };
-    int menuSize = sizeof(menu) / sizeof(menu[0]);
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int menuSize = 0;
+#ifdef FB
+    vbeInit();
+#endif
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isStatic || countSubstrs(rawMenu[i].name, "x") == 1 || vgaModeAvailable(atoi(rawMenu[i].id)))
+            menu[menuSize++] = rawMenu[i];
+#ifdef FB
+    vbeShutdown();
+#endif
+    if (menuSize == 8)
+        menuSize--;
 
     int running = 1;
     int cursorX = 1;

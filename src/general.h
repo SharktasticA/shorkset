@@ -34,6 +34,7 @@ typedef struct {
 
 char *bytesToReadable(const char *, const long long);
 char *captureProgramOutput(const char *, const size_t);
+int countSubstrs(const char *, const char *);
 char *extractFromPoint(char *, size_t, char, int);
 int fileExists(const char*);
 char *findErase(const char *, const size_t, const char *);
