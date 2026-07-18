@@ -304,7 +304,7 @@ int loadKeymaps(void)
     {
         if (entry->d_name[0] == '.')
             continue;
-        if (KEYMAPS_COUNT >= MAX_FONTS)
+        if (KEYMAPS_COUNT >= MAX_KEYMAPS)
             break;
             
         snprintf(KEYMAPS[KEYMAPS_COUNT], PATH_MAX, "%s/%s", KEYMAPS_DIR, entry->d_name);
@@ -783,7 +783,7 @@ void showFontPSFMenu(void)
         // Add font
         snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s", nameStr);
         snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
-        snprintf(menu[menuSize].payload, sizeof(menu[menuSize].payload), "%s", CONFONTS[i]);
+        menu[menuSize].payload = strdup(CONFONTS[i]);
         menu[menuSize].action = NULL;
         menu[menuSize].isVisible = 1;
         menu[menuSize].isStatic = 0;
@@ -947,7 +947,7 @@ void showKeymapMenu(void)
         // Add font
         snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s", nameStr);
         snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
-        snprintf(menu[menuSize].payload, sizeof(menu[menuSize].payload), "%s", KEYMAPS[i]);
+        menu[menuSize].payload = strdup(KEYMAPS[i]);
         menu[menuSize].action = NULL;
         menu[menuSize].isVisible = 1;
         menu[menuSize].isStatic = 0;
