@@ -107,6 +107,7 @@ void showMainMenu(void);
 void showNetDriversMenu(void);
 void showSndDriversMenu(void);
 void showVolumeMenu(void);
+void toggleDriver(const char*);
 void writeConf(void);
 
 #endif

@@ -1045,7 +1045,7 @@ void showDriversListMenu(const char *cat)
                 break;
 
             case ENTER:
-                clearScreen();
+                toggleDriver(menu[cursorY - 1].id);
                 break;
         
             case QUIT:
@@ -1759,6 +1759,65 @@ void showVolumeMenu(void)
     }
 
     clearScreen();
+}
+
+/**
+ * Loads/unloads the given driver's Linux module id depending on if its
+ * unloaded/loaded.
+ * @param id ID for Linux module to toggle
+ */
+void toggleDriver(const char *id)
+{
+    // Check if module is loaded
+    LoadedModules modules = getLoadedModules();
+    int loaded = 0;
+    for (int i = 0; i < modules.count; i++)
+    {
+        if (strcmp(id, modules.modules[i]) == 0)
+        {
+            loaded = 1;
+            break;
+        }
+    }
+
+    tcflush(STDIN_FILENO, TCIFLUSH);
+
+    if (!loaded)
+    {
+        char dlgMsg[256];
+        snprintf(dlgMsg, 256, "The Linux module for the %s driver is being "
+            "loaded. Please wait.", id);
+        showDialog(dlgMsg, 50);
+        sleep(1);
+
+        // Load driver's module via modprobe
+        int result = runCmd("modprobe", id, NULL);
+        if (result != 0)
+        {
+            EXIT_MSG = strdup("ERROR: could not run modprobe to load "
+                "driver module");
+            exit(1);
+        }
+    }
+    else
+    {
+        char dlgMsg[256];
+        snprintf(dlgMsg, 256, "The Linux module for the %s driver is being "
+            "unloaded. Please wait.", id);
+        showDialog(dlgMsg, 50);
+        sleep(1);
+
+        // Unload driver's module via rmmod
+        int result = runCmd("rmmod", id, NULL);
+        if (result != 0)
+        {
+            EXIT_MSG = strdup("rmmod: could not run rmmod to unload "
+                "driver module");
+            exit(1);
+        }
+    }
+
+    tcflush(STDIN_FILENO, TCIFLUSH);
 }
 
 /**

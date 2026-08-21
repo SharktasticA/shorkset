@@ -850,7 +850,8 @@ void showCursor(void)
  */
 void showDialog(char *message, int width)
 {
-    if (width > TERM_SIZE.ws_col - 6) width = TERM_SIZE.ws_col - 6;
+    if (width > TERM_SIZE.ws_col - 6)
+        width = TERM_SIZE.ws_col - 6;
     
     // Modify message to fit the given width
     size_t msgLen = strlen(message) + 1;
@@ -873,7 +874,8 @@ void showDialog(char *message, int width)
 
     // Print top border
     printf("\x1b[%d;%dH", startRow, startCol);
-    for (int j = 0; j < width + 4; j++) putchar(pad);
+    for (int j = 0; j < width + 4; j++)
+        putchar(pad);
 
     // Print message
     char *currPos = buf;
@@ -900,14 +902,17 @@ void showDialog(char *message, int width)
 
         printf("%c ", pad);
         printf("%.*s", len, lineStart);
-        for (int j = len; j < width; j++) putchar(' ');
+        for (int j = len; j < width; j++)
+            putchar(' ');
         printf(" %c", pad);
     }
 
     // Print bottom border
     printf("\x1b[%d;%dH", startRow + 1 + lines, startCol);
-    for (int j = 0; j < width + 4; j++) putchar(pad);
+    for (int j = 0; j < width + 4; j++)
+        putchar(pad);
 
     // Reset console colour
-    if (COL_ENABLED) printf("\033[%sm", COL_RESET);
+    if (COL_ENABLED)
+        printf("\033[%sm", COL_RESET);
 }

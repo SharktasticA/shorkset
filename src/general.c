@@ -13,7 +13,6 @@
 
 
 
-#include "colours.h"
 #include "general.h"
 #include "shorkmenu.h"
 
@@ -22,10 +21,12 @@
 #include <sys/ioctl.h>
 #include <linux/limits.h>
 #include <sys/stat.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 
 
@@ -140,7 +141,7 @@ char *bytesToReadable(const char *from, const long long val)
  * @param bufferSize The maximum string size
  * @return char* Captured program output as string
  */
-char *captureProgramOutput(const char *command, const size_t bufferSize)
+char *captureProgramOutput(const char *command, const int bufferSize)
 {
     FILE* stream = popen(command, "r");
     if (!stream)
@@ -153,15 +154,15 @@ char *captureProgramOutput(const char *command, const size_t bufferSize)
         return NULL;
     }
 
-    size_t len = 0;
-    size_t chunkSize = 256;
+    int len = 0;
+    int chunkSize = 256;
     char tmp[256];
 
     while (len < bufferSize - 1)
     {
-        size_t toRead = (bufferSize - 1 - len < chunkSize) ? bufferSize - 1 - len : chunkSize;
+        int toRead = (bufferSize - 1 - len < chunkSize) ? bufferSize - 1 - len : chunkSize;
 
-        size_t bytesRead = fread(tmp, 1, toRead, stream);
+        int bytesRead = fread(tmp, 1, toRead, stream);
         if (bytesRead == 0)
             break;
 
@@ -207,7 +208,7 @@ int countSubstrs(const char *str, const char *sub)
  * @param inputSize Size to use when allocating the result string
  * @return String containing what's left after separation and cleaning
  */
-char *extractFromPoint(char *input, size_t inputSize, char point, int offset)
+char *extractFromPoint(char *input, int inputSize, char point)
 {
     if (!input || inputSize < 2) return strdup("");
 
@@ -220,8 +221,10 @@ char *extractFromPoint(char *input, size_t inputSize, char point, int offset)
     char *sep = strchr(input, point);
     if (!sep) return result;
 
-    // Our start position taking into account possible offset
-    char *start = sep + offset;
+    // Make our start position take into account any possible offset
+    char *start = sep + 1;
+    while (*start == ' ' || *start == '\t')
+        start++;
 
     // Trim potential leading double quote
     if (*start == '"') start++;
@@ -229,7 +232,7 @@ char *extractFromPoint(char *input, size_t inputSize, char point, int offset)
     // Copy everything after the start position into our result
     strncpy(result, start, inputSize - 1);
     result[inputSize - 1] = '\0';
-    size_t len = strlen(result);
+    int len = strlen(result);
 
     // Trim potential trailing newline 
     if (len > 0 && result[len - 1] == '\n')
@@ -265,11 +268,11 @@ int fileExists(const char *file)
  * @param needle Substring to find and erase
  * @return String containing what's left after erasing
  */
-char *findErase(const char *input, const size_t inputSize, const char *needle)
+char *findErase(const char *input, const int inputSize, const char *needle)
 {
     if (!input || !needle || inputSize < 2) return strdup("");
 
-    size_t needleLen = strlen(needle);
+    int needleLen = strlen(needle);
     if (needleLen == 0) return strdup("");
 
     // Prepare result string
@@ -285,7 +288,7 @@ char *findErase(const char *input, const size_t inputSize, const char *needle)
     char *pos = result;
     while ((pos = strstr(pos, needle)) != NULL)
     {
-        size_t tailLen = strlen(pos + needleLen);
+        int tailLen = strlen(pos + needleLen);
         memmove(pos, pos + needleLen, tailLen + 1);
     }
 
@@ -301,17 +304,20 @@ char *findErase(const char *input, const size_t inputSize, const char *needle)
  * @param replacement New string to insert
  * @return String after term replacement
  */
-char *findReplace(const char *input, const size_t inputSize, const char *needle, const char *replacement)
+char *findReplace(const char *input, const int inputSize, const char *needle, const char *replacement)
 {
-    if (!input || !needle || !replacement || inputSize < 2) return strdup("");
+    if (!input || !needle || !replacement || inputSize < 2) 
+        return strdup("");
 
-    size_t needleLen = strlen(needle);
-    size_t replacementLen = strlen(replacement);
-    if (needleLen == 0) return strdup("");
+    int needleLen = strlen(needle);
+    int replacementLen = strlen(replacement);
+    if (needleLen == 0)
+        return strdup("");
 
     // Prepare result string
     char *result = malloc(inputSize);
-    if (!result) return strdup("");
+    if (!result)
+        return strdup("");
 
     // Copy input string to result
     strncpy(result, input, inputSize);
@@ -320,21 +326,24 @@ char *findReplace(const char *input, const size_t inputSize, const char *needle,
     char *pos = result;
     while ((pos = strstr(pos, needle)) != NULL)
     {
-        size_t tailLen = strlen(pos + needleLen);
+        int tailLen = strlen(pos + needleLen);
 
-        // If replacement is larger than our needle, realloc memory to avoid overflowing
         if (replacementLen > needleLen)
         {
-            size_t currentLen = strlen(result);
-            size_t newLen = currentLen + (replacementLen - needleLen) + 1;
+            int currentLen = strlen(result);
+            int newLen = currentLen + (replacementLen - needleLen) + 1;
+            if (newLen < inputSize)
+                newLen = inputSize;
+            int offset = pos - result;
             char *tmp = realloc(result, newLen);
-            if (!tmp) break;
-            pos = tmp + (pos - result);
+            if (!tmp)
+                break;
             result = tmp;
+            pos = result + offset;
         }
 
-        // Move the trailing text to accomodate the new size and paste our replacement into
-        // the 'gap'
+        // Move the trailing text to accomodate the new size and paste our
+        // replacement into the 'gap'
         memmove(pos + replacementLen, pos + needleLen, tailLen + 1);
         memcpy(pos, replacement, replacementLen);
         pos += replacementLen;
@@ -344,6 +353,7 @@ char *findReplace(const char *input, const size_t inputSize, const char *needle,
 }
 
 /**
+ * DEPRECATED: Use wordWrap() instead!
  * Adds new lines to a given string based on the requested line width.
  * @param input Input string
  * @param width Characters per line
@@ -456,7 +466,7 @@ char *getBinDir(void)
 {
     // Get binary's full path
     static char binDir[PATH_MAX];
-    ssize_t len = readlink("/proc/self/exe", binDir, sizeof(binDir) - 1);
+    int len = readlink("/proc/self/exe", binDir, sizeof(binDir) - 1);
     if (len <= 0) return NULL;
     binDir[len] = '\0';
 
@@ -471,11 +481,11 @@ char *getBinDir(void)
 /**
  * Gets the parent process ID (PPID) and name of a given process ID (PID).
  * @param pid The input PID
- * @return Process struct with the found PPID and name; pid is -1 if something went wrong
+ * @return PROCESS struct with the found PPID and name; pid is -1 if something went wrong
  */
-Process getParentProcess(int pid)
+PROCESS getParentProcess(int pid)
 {
-    Process result = { -1, "" };
+    PROCESS result = { -1, "" };
 
     // Open the process's status file
     char pidPath[PATH_MAX];
@@ -533,6 +543,43 @@ int isFileExecutable(char *currPath, struct dirent *entry)
     snprintf(filePath, PATH_MAX + 256, "%s/%s", currPath, entry->d_name);
     if (access(filePath, X_OK) == 0) return 1;
     else return 0;
+}
+
+/**
+ * Checks if the given string is entirely numeric.
+ * @param str Input string to test
+ * @param count Number of characters to test (-1 to test all)
+ * @return 1 if numeric; 0 if not or empty string
+ */
+int isNumeric(const char *str, const int count)
+{
+    if (!str)
+        return 0;
+
+    int numeric = 0;
+    int i = 0;
+
+    while (*str && (count == -1 || i < count))
+    {
+        // Skip over any whitespace
+        if (isspace((unsigned char)*str))
+        {
+            str++;
+            i++;
+            continue;
+        }
+
+        if (!isdigit((unsigned char)*str))
+            return 0;
+
+        numeric = 1;
+        str++;
+        i++;
+    }
+
+    if (count != -1 && i < count)
+        return 0;
+    return numeric;
 }
 
 /**
@@ -686,27 +733,31 @@ int loadCSVLine(char *line, char *out[], int maxFields)
 
 int natCmp(const void *a, const void *b)
 {
-    const char *sa = (const char *)a;
-    const char *sb = (const char *)b;
+    const char *s1 = (const char *)a;
+    const char *s2 = (const char *)b;
 
-    while (*sa && *sb)
+    while (*s1 && *s2)
     {
-        if (isdigit((unsigned char)*sa) && isdigit((unsigned char)*sb))
+        if (isdigit((unsigned char)*s1) && isdigit((unsigned char)*s2))
         {
-            long na = strtol(sa, (char **)&sa, 10);
-            long nb = strtol(sb, (char **)&sb, 10);
-            if (na != nb)
-                return (na > nb) - (na < nb);
+            char *end1, *end2;
+            long n1 = strtol(s1, &end1, 10);
+            long n2 = strtol(s2, &end2, 10);
+            if (n1 != n2) return (n1 > n2) - (n1 < n2);
+            s1 = end1;
+            s2 = end2;
         }
         else
         {
-            if (*sa != *sb)
-                return (unsigned char)*sa - (unsigned char)*sb;
-            sa++;
-            sb++;
+            int c1 = tolower((unsigned char)*s1);
+            int c2 = tolower((unsigned char)*s2);
+            if (c1 != c2) return c1 - c2;
+            s1++;
+            s2++;
         }
     }
-    return (unsigned char)*sa - (unsigned char)*sb;
+
+    return *s1 - *s2;
 }
 
 /**
@@ -780,6 +831,112 @@ int readHexFile(const char *path)
 }
 
 /**
+ * Removes any bracketed/parenthesis contents from a given input string.
+ * @param input Input string
+ * @param inputSize Size to use when allocating the result string
+ * @return Result string after operation
+ */
+char *removeBrackets(const char *input, const int inputSize)
+{
+    if (!input)
+        return NULL;
+
+    // In case the input size happens to be too small...
+    int inputLen = strlen(input);
+    if (inputLen == 0)
+        return NULL;
+    int allocSize = inputSize;
+    if (allocSize < inputLen + 1)
+        allocSize = inputLen + 1;
+
+    // Prepare result string
+    char *result = calloc(allocSize, 1);
+    if (!result)
+        return NULL;
+
+    const char *src = input;
+    char *dst = result;
+    int depth = 0;
+    while (*src)
+    {
+        if (*src == '(')
+        {
+            depth++;
+            src++;
+        }
+        else if (*src == ')')
+        {
+            if (depth > 0)
+                depth--;
+            src++;
+        }
+        else if (depth == 0)
+            *dst++ = *src++;
+        else
+            src++;
+    }
+    *dst = '\0';
+
+    return result;
+}
+
+/**
+ * Runs an external command.
+ * @param cmd Command name or path
+ * @param ... 0 or more const char* arguments to use with cmd (MUST NULL
+ *            TERMINATE)
+ * @return >= 0 if command ran and exited normally; -1 if not or result
+ *         indetermined
+ */
+int runCmd(const char *cmd, ...)
+{
+    const char *argv[MAX_CMD_ARGS];
+    int argc = 0;
+
+    // First ele is always the cmd itself
+    argv[argc++] = cmd;
+
+    // Gather variadic arguments into argv
+    va_list args;
+    va_start(args, cmd);
+    const char *arg;
+    while ((arg = va_arg(args, const char *)) != NULL &&
+        argc < MAX_CMD_ARGS - 1)
+        argv[argc++] = arg;
+    va_end(args);
+
+    // execvp needs argv NULL-terminated 
+    argv[argc] = NULL;
+
+    // Child
+    pid_t pid = fork();
+    if (pid < 0)
+        // Fork failed
+        return -1;
+
+    if (pid == 0)
+    {
+        execvp(cmd, (char *const *)argv);
+        // Only reached in execvp() failed, so exit 127 for "command not
+        // found"
+        _exit(127);
+    }
+
+    // Param
+    int status;
+    if (waitpid(pid, &status, 0) < 0)
+        // waitpid() failed
+        return -1;
+
+    if (WIFEXITED(status))
+        // Child exited normally, so return its exit status
+        return WEXITSTATUS(status);
+
+    // Child probably terminated abnormally
+    return -1;
+}
+
+/**
  * Splits a given string via any newline escape sequences into an array of strings.
  * @param text Text to split
  * @param textLines Text once split
@@ -804,4 +961,199 @@ void splitText(char *text, char *textLines[], int totalLines)
 
     if (count < totalLines)
         textLines[count++] = start;
+}
+
+/**
+ * Word-wraps a given string based on the requested width, optionalling adding
+ * indents to the start of each newly-made line.
+ * @param input Input string
+ * @param width Number of characters per line
+ * @param indent Indent to include after a wrap
+ * @param hardBreak Flags if the function should hard-break words if needed
+ * @param trim Flags that any trailing newlines should be removed
+ * @return Malloc'd WORD_WRAPPED struct containing the result string, how long
+ *         it is & how many lines it has
+ */
+WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int trim)
+{
+    if (!input || width < 1)
+        return NULL;
+    
+    // Initialse variables that help us track progress
+    int inputStrLen = strlen(input);
+    int indentLen = indent ? strlen(indent) : 0;
+    // Count of lines found in the ouptu
+    int lines = 1;
+    // Index of the most recent breakable character
+    int lastBreakPos = -1;
+    // The character lastBreakPos points to
+    char lastBreakChar = '\0';
+    // The current size of the line being processed 
+    int widthCount = 1;
+
+    // Allocate a buffer for the result string that we can grow if needed
+    int capacity = inputStrLen + 1;
+    char *result = malloc(capacity);
+    if (!result)
+        return NULL;
+    memcpy(result, input, inputStrLen + 1);
+
+    // Iterate through the input string to find line breaks or places to add new ones
+    for (int i = 0; i < inputStrLen; i++)
+    {
+        // Skip counting ANSI escape sequences
+        if (result[i] == '\033')
+        {
+            while (i < inputStrLen && result[i] != 'm')
+                i++;
+            if (i >= inputStrLen)
+                break;
+            continue;
+        }
+
+        // If a newline is already in the string, handle it and advance to next
+        // iteration
+        if (result[i] == '\n')
+        {
+            lines++;
+            widthCount = 0;
+            lastBreakPos = -1;
+            lastBreakChar = '\0';
+            continue;
+        }
+
+        // If we have an indent, add some grace in case it's being used to
+        // skip over a field heading (etc.)
+        if (indentLen > 0 && widthCount < indentLen)
+        {
+            widthCount++;
+            continue;
+        }
+        
+        // Begin word wrapping once the line width is saturated
+        if (widthCount >= width)
+        {
+            int breaking = 0;
+
+            // Preferred case: make a soft wrap at lastBreak
+            if (lastBreakPos != -1)
+                breaking = 1;
+            // Fallback case: if hardBreak=1, wrap immediately
+            else if (hardBreak && result[i] != '\n' && result[i] != ' ')
+                breaking = 1;
+
+            if (breaking)
+            {
+                int breakPos;
+
+                // If lastBreak is a space, we can just overwrite it with '\n'
+                if (lastBreakPos != -1 && lastBreakChar == ' ')
+                {
+                    breakPos = lastBreakPos;
+                    result[breakPos] = '\n';
+                }
+                // If lastBreak is not a space, we need to make space instead
+                // of overwrite lastBreak's current character
+                else
+                {
+                    // Where to insert
+                    int insertAt = (lastBreakPos != -1) ? lastBreakPos + 1 : i;
+
+                    // Make sure there is room for new newline char
+                    int needed = inputStrLen + 1 + 1;
+                    if (needed > capacity)
+                    {
+                        int newCapacity = capacity ? capacity * 2 : 16;
+                        while (newCapacity < needed)
+                            newCapacity *= 2;
+
+                        char *newResult = realloc(result, newCapacity);
+                        if (!newResult) { free(result); return NULL; }
+                        result = newResult;
+                        capacity = newCapacity;
+                    }
+
+                    memmove(result + insertAt + 1, result + insertAt, inputStrLen - insertAt + 1);
+                    inputStrLen++;
+                    result[insertAt] = '\n';
+                    i = insertAt + 1;
+                    breakPos = insertAt;
+                }
+
+                lines++;
+
+                // If indent is desired, time to add that to the start of the line
+                if (indent && indentLen > 0)
+                {
+                    int needed2 = inputStrLen + indentLen + 1;
+                    if (needed2 > capacity)
+                    {
+                        // Make sure there is room for the extra length needed for
+                        // inserting an indent
+                        int newCapacity = capacity ? capacity * 2 : 16;
+                        while (newCapacity < needed2)
+                            newCapacity *= 2;
+
+                        char *newResult = realloc(result, newCapacity);
+                        if (!newResult)
+                        {
+                            free(result);
+                            return NULL;
+                        }
+                        result = newResult;
+                        capacity = newCapacity;
+                    }
+
+                    memmove(result + breakPos + 1 + indentLen, result + breakPos + 1, inputStrLen - breakPos);
+                    memcpy(result + breakPos + 1, indent, indentLen);
+                    inputStrLen += indentLen;
+                    if (breakPos <= i)
+                        i += indentLen;
+                }
+
+                widthCount = i - breakPos;
+                lastBreakPos = -1;
+                lastBreakChar = '\0';
+            }
+        }
+
+        // Track where the last break char was so we can go back to wrap from it
+        for (int j = 0; j < BREAK_CHARS_LEN - 1; j++)
+        {
+            if (result[i] == BREAK_CHARS[j])
+            {
+                lastBreakPos = i;
+                lastBreakChar = BREAK_CHARS[j];
+                break;
+            }
+        }
+
+        widthCount++;
+    }
+
+    // If desired, strip possible trailing new line
+    if (trim)
+    {
+        int end = strlen(result) - 1;
+        while (end >= 0 && result[end] == '\n')
+        {
+            result[end] = '\0';
+            end--;
+            lines--;
+        }
+        inputStrLen = strlen(result);
+    }
+
+    WORD_WRAPPED *wrapped = malloc(sizeof(WORD_WRAPPED));
+    if (!wrapped)
+    {
+        free(result);
+        return NULL;
+    }
+
+    wrapped->str = result;
+    wrapped->len = inputStrLen;
+    wrapped->lines = lines;
+
+    return wrapped;
 }
