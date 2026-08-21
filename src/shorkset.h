@@ -21,6 +21,20 @@
 
 
 
+#define CSV_BUFFER              16384
+#define CONFONTS_DIR            "/usr/share/consolefonts"
+#define DOT_CONF                "/etc/shorkset.conf"
+#define KERNEL_VER_LEN          16
+#define KEYMAPS_DIR             "/usr/share/keymaps"
+#define MAX_FONTS               128
+#define MAX_KEYMAPS             64
+#define MAX_MODULE_NAME_LEN     24
+#define MAX_MODULES_ENTRIES     128
+#define MODULES_CSV_PATH        "/usr/share/shorkset/modules.csv"
+#define MODULES_DIR             "/lib/modules"
+
+
+
 typedef struct {
     // Display resolution code (default: 3840)
     int dispRes;
@@ -37,6 +51,11 @@ typedef struct {
 } Config;
 
 typedef struct {
+    char modules[MAX_MODULES_ENTRIES][MAX_MODULE_NAME_LEN];
+    int count;
+} LoadedModules;
+
+typedef struct {
     char *name;
     char *category;
     char *bus;
@@ -44,17 +63,6 @@ typedef struct {
 } ModuleEntry;
 
 
-
-#define CSV_BUFFER          16384
-#define CONFONTS_DIR        "/usr/share/consolefonts"
-#define DOT_CONF            "/etc/shorkset.conf"
-#define KERNEL_VER_LEN      16
-#define KEYMAPS_DIR         "/usr/share/keymaps"
-#define MAX_FONTS           128
-#define MAX_KEYMAPS         64
-#define MAX_MODULES_ENTRY   128
-#define MODULES_CSV_PATH    "/usr/share/shorkset/modules.csv"
-#define MODULES_DIR         "/lib/modules"
 
 static const char *CFG_PATHS[] = {
     "/boot/grub/grub.cfg",
@@ -67,7 +75,7 @@ extern int CONFONTS_COUNT;
 extern char KERNEL_VER[KERNEL_VER_LEN];
 extern char KEYMAPS[MAX_KEYMAPS][PATH_MAX];
 extern int KEYMAPS_COUNT;
-extern ModuleEntry MODULES[MAX_MODULES_ENTRY];
+extern ModuleEntry MODULES[MAX_MODULES_ENTRIES];
 extern int MODULES_NO;
 
 
@@ -77,6 +85,7 @@ void applyFontColTtys(char*);
 void applyVolume(int);
 void getCurrRes(void);
 void getKernelVer(void);
+LoadedModules getLoadedModules(void);
 int getHWVolume(int);
 void loadConf(void);
 int loadConFonts(void);

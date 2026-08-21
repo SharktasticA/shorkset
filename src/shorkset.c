@@ -12,6 +12,7 @@
 
 
 
+#include "colours.h"
 #include "general.h"
 #include "shorkmenu.h"
 #include "shorkset.h"
@@ -41,7 +42,7 @@ char KEYMAPS[MAX_KEYMAPS][PATH_MAX] = {0};
 int KEYMAPS_COUNT = 0;
 int IS_NET_MODULES = 0;
 int IS_SND_MODULES = 0;
-ModuleEntry MODULES[MAX_MODULES_ENTRY] = {0};
+ModuleEntry MODULES[MAX_MODULES_ENTRIES] = {0};
 int MODULES_NO;
 
 
@@ -196,6 +197,44 @@ void getKernelVer(void)
 
     strncpy(KERNEL_VER, un.release, KERNEL_VER_LEN - 1);
     KERNEL_VER[KERNEL_VER_LEN - 1] = '\0';
+}
+
+/**
+ * Returns a list of loaded Linux modules.
+ * @return Initialised LoadedModules struct containing an array of module
+ *         names and how many were found.
+ */
+LoadedModules getLoadedModules(void)
+{
+    LoadedModules result;
+    result.count = 0;
+
+    FILE *stream = fopen("/proc/modules", "r");
+    if (!stream)
+    {
+        EXIT_MSG = strdup("ERROR: could not access /proc/modules");
+        exit(1);
+    }
+
+    char buffer[PATH_MAX];
+    while (fgets(buffer, PATH_MAX, stream))
+    {
+        if (result.count >= MAX_MODULES_ENTRIES)
+            break;
+
+        char name[128];
+        if (sscanf(buffer, "%127s", name) != 1)
+            continue;
+
+        size_t len = strlen(name);
+        if (len >= MAX_MODULE_NAME_LEN)
+            continue;
+
+        strcpy(result.modules[result.count], name);
+        result.count++;
+    }
+
+    return result;
 }
 
 /**
@@ -372,7 +411,7 @@ int loadModules(void)
         p++;
 
     int i = 0;
-    while (*p && i < MAX_MODULES_ENTRY)
+    while (*p && i < MAX_MODULES_ENTRIES)
     {
         char *line = p;
 
@@ -907,27 +946,73 @@ void showDriversListMenu(const char *cat)
     if (strcmp(cat, "net") == 0)
     {
         snprintf(title, 32, "Toggle network interface driver");
-        snprintf(msg, 200, "Any driver marked with \"*\" is currently "
-            "loaded. You may load multiple network interface drivers.");
+        snprintf(msg, 200, "Any driver marked with in green with a leading "
+            "asterisk (\"*\") is currently loaded. You may load multiple "
+            "network interface drivers.");
     }
     else if (strcmp(cat, "snd") == 0)
     {
         snprintf(title, 32, "Toggle sound card driver");
-        snprintf(msg, 200, "A driver marked with \"*\" is currently "
-            "loaded. You may only load one sound card driver at a time. "
-            "Loading a driver whilst another is loaded will unload the "
-            "latter.");
+        snprintf(msg, 200, "A driver marked with in green with a leading "
+            "asterisk (\"*\") is currently loaded. You may only load one "
+            "sound card driver at a time. Loading a driver will unload any "
+            "existing ones.");
     }
 
     while (running)
     {
         if (fullRedraw)
         {
+            // Mark/unmark the loaded modules
+            LoadedModules loaded = getLoadedModules();
+            if (loaded.count > 0)
+            {
+                for (int i = 0; i < menuSize; i++)
+                {
+                    int marked = 0;
+                    for (int j = 0; j < loaded.count; j++)
+                    {
+                        if (strcmp(menu[i].id, loaded.modules[j]) == 0)
+                        {
+                            // Add leading "*" if missing
+                            if (menu[i].name[0] != '\x1b')
+                            {
+                                char buffer[sizeof(menu[i].name)];
+                                snprintf(buffer, sizeof(buffer), 
+                                    "\x1b[%sm*%s\x1b[0m", COL_FOR_GREEN, 
+                                    menu[i].name);
+                                strcpy(menu[i].name, buffer);
+                            }
+                            marked = 1;
+                            break;
+                        }
+                    }
+
+                    if (!marked)
+                    {
+                        // Remove leading "*" if present
+                        if (menu[i].name[0] == '\x1b')
+                        {
+                            char *ast = strchr(menu[i].name, '*');
+                            if (ast)
+                            {
+                                char *rst = strstr(ast, "\x1b[0m");
+                                size_t len = rst ?
+                                    (size_t)(rst - (ast + 1)) :
+                                    strlen(ast + 1);
+                                memmove(menu[i].name, ast + 1, len);
+                                menu[i].name[len] = '\0';
+                            }
+                        }
+                    }
+                }
+            }
+
             clearScreen();
             printHeader(title);
             printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
                 menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
-            printFooter("[jk] Navigate [Enter] Select [q] Quit");
+            printFooter("[jk] Navigate [Enter] Toggle [q] Quit");
         }
         else
         {

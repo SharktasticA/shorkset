@@ -18,15 +18,15 @@ e1000,kernel/drivers/net/ethernet/intel/e1000/e1000.ko.gz,net,PCI,Intel PRO/1000
 nmclan_cs,kernel/drivers/net/ethernet/amd/nmclan_cs.ko.gz,net,PCMCIA,New Media LAN
 ne,kernel/drivers/net/ethernet/8390/ne.ko.gz,net,ISA,Novell NE1000/NE2000 & clones
 pcnet_cs,kernel/drivers/net/ethernet/8390/pcnet_cs.ko.gz,net,PCMCIA,Novell NE2000
-ne2k-pci,kernel/drivers/net/ethernet/8390/ne2k-pci.ko.gz,net,PCI,Novell NE2000 & clones
+ne2k_pci,kernel/drivers/net/ethernet/8390/ne2k-pci.ko.gz,net,PCI,Novell NE2000 & clones
 ns83820,kernel/drivers/net/ethernet/natsemi/ns83820.ko.gz,net,PCI,NS DP83820
 smc91c92_cs,kernel/drivers/net/ethernet/smsc/smc91c92_cs.ko.gz,net,PCMCIA,SMC 91Cxx
 epic100,kernel/drivers/net/ethernet/smsc/epic100.ko.gz,net,PCI,SMC 9432 EtherPower II
 smsc9420,kernel/drivers/net/ethernet/smsc/smsc9420.ko.gz,net,PCI,SMSC LAN9420
 uli526x,kernel/drivers/net/ethernet/dec/tulip/uli526x.ko.gz,net,PCI,ULi M526x
 wd,kernel/drivers/net/ethernet/8390/wd.ko.gz,net,ISA,Western Digital WD80x3
-winbond-840,kernel/drivers/net/ethernet/dec/tulip/winbond-840.ko.gz,net,PCI,Winbond W89c840
+winbond_840,kernel/drivers/net/ethernet/dec/tulip/winbond-840.ko.gz,net,PCI,Winbond W89c840
 xirc2ps_cs,kernel/drivers/net/ethernet/xircom/xirc2ps_cs.ko.gz,net,PCMCIA,Xircom 16-bit
 xircom_cb,kernel/drivers/net/ethernet/dec/tulip/xircom_cb.ko.gz,net,PCMCIA,Xircom Tulip
-snd-ens1370,kernel/sound/pci/snd-ens1370.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1370
-snd-ens1371,kernel/sound/pci/snd-ens1371.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1371/1373
+snd_ens1370,kernel/sound/pci/snd-ens1370.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1370
+snd_ens1371,kernel/sound/pci/snd-ens1371.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1371/1373
