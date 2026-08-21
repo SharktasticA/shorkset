@@ -199,6 +199,77 @@ int countSubstrs(const char *str, const char *sub)
 }
 
 /**
+ * Appends a given item string to the given comma-separated buffer.
+ * @param buffer Buffer containing the CSV string to operate on
+ * @param bufferSize Buffer size
+ * @param item Item to add
+ * @return 1 if successfully added; 0 if present or no space
+ */
+int csvAppend(char *buffer, int bufferSize, const char *item)
+{
+    size_t itemLen = strlen(item);
+    size_t currLen = strlen(buffer);
+    const char *p = buffer;
+
+    while ((p = strstr(p, item)) != NULL)
+    {
+        int startOk = (p == buffer) || (*(p - 1) == ',');
+        int endOk = (p[itemLen] == '\0') || (p[itemLen] == ',');
+        if (startOk && endOk)
+            // Already present
+            return 0;
+        p += itemLen;
+    }
+
+    size_t sepLen = (currLen > 0) ? 1 : 0;
+    if (currLen + sepLen + itemLen + 1 > bufferSize)
+        // No space
+        return 0;
+
+    if (sepLen)
+        strcat(buffer, ",");
+    strcat(buffer, item);
+
+    return 1;
+}
+
+/**
+ * Removes a given item string to the given comma-separated buffer.
+ * @param buffer Buffer containing the CSV string to operate on
+ * @param item Item to remove
+ * @return 1 if successfully removed; 0 if not found
+ */
+int csvRemove(char *buffer, const char *item)
+{
+    size_t itemLen = strlen(item);
+    char *p = buffer;
+
+    while ((p = strstr(p, item)) != NULL)
+    {
+        int startOk = (p == buffer) || (*(p - 1) == ',');
+        int endOk = (p[itemLen] == '\0') || (p[itemLen] == ',');
+
+        if (startOk && endOk)
+        {
+            char *removeStart = p;
+            char *removeEnd = p + itemLen;
+            if (*removeEnd == ',')
+                removeEnd++;
+            else if (removeStart != buffer)
+                removeStart--;
+            memmove(removeStart, removeEnd, strlen(removeEnd) + 1);
+            // Found and removed
+            return 1;
+        }
+
+        p += itemLen;
+    }
+
+    // Not found
+    return 0;
+}
+
+/**
  * Extracts a substring from an input string after a given separation character
  * and offset. Also removes any surrounding quotes or trailing newline characters
  * present. 

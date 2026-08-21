@@ -46,6 +46,8 @@ typedef struct {
     char fontPSF[PATH_MAX];
     // Keyboard layout (keymap) path (default: "en_us")
     char keymap[PATH_MAX];
+    // Linux modules to load at system startup
+    char modules[1024];
     // System volume (default: 40)
     int volume;
 } Config;

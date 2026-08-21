@@ -34,7 +34,7 @@
 
 
 
-Config CONFIG = { 3840, "white", "0;37", "default", "en_us", 40 };
+Config CONFIG = { 3840, "white", "0;37", "default", "en_us", "", 40 };
 char CONFONTS[MAX_FONTS][PATH_MAX] = {0};
 int CONFONTS_COUNT = 0;
 char KERNEL_VER[KERNEL_VER_LEN] = {0};
@@ -293,6 +293,8 @@ void loadConf(void)
                 snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "%s", value);
             else if (strncmp(buffer, "KEYMAP=", 7) == 0)
                 snprintf(CONFIG.keymap, sizeof(CONFIG.keymap), "%s", value);
+            else if (strncmp(buffer, "MODULES=", 7) == 0)
+                snprintf(CONFIG.modules, sizeof(CONFIG.modules), "%s", value);
             else if (strncmp(buffer, "VOLUME=", 7) == 0)
                 CONFIG.volume = atoi(value);
         }
@@ -1798,6 +1800,7 @@ void toggleDriver(const char *id)
                 "driver module");
             exit(1);
         }
+        csvAppend(CONFIG.modules, sizeof(CONFIG.modules), id);
     }
     else
     {
@@ -1815,8 +1818,10 @@ void toggleDriver(const char *id)
                 "driver module");
             exit(1);
         }
+        csvRemove(CONFIG.modules, id);
     }
 
+    writeConf();
     tcflush(STDIN_FILENO, TCIFLUSH);
 }
 
@@ -1839,6 +1844,7 @@ void writeConf(void)
     fprintf(stream, "FONT_COL_ANSI=\"%s\"\n", CONFIG.fontColANSI);
     fprintf(stream, "FONT_PSF=\"%s\"\n", CONFIG.fontPSF);
     fprintf(stream, "KEYMAP=\"%s\"\n", CONFIG.keymap);
+    fprintf(stream, "MODULES=\"%s\"\n", CONFIG.modules);
     fprintf(stream, "VOLUME=%d\n", CONFIG.volume);
     fclose(stream);
     sync();

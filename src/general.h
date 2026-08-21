@@ -50,6 +50,8 @@ static const char BREAK_CHARS[BREAK_CHARS_LEN] = { " _-+,./\\" };
 char *bytesToReadable(const char *, const long long);
 char *captureProgramOutput(const char *, const int);
 int countSubstrs(const char *, const char *);
+int csvAppend(char*, int, const char*);
+int csvRemove(char*, const char*);
 char *extractFromPoint(char *, int, char);
 int fileExists(const char*);
 char *findErase(const char *, const int, const char *);
