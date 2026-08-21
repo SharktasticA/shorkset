@@ -36,10 +36,25 @@ typedef struct {
     int volume;
 } Config;
 
+typedef struct {
+    char *name;
+    char *category;
+    char *bus;
+    char *description;
+} ModuleEntry;
 
 
-#define MAX_FONTS       126
-#define MAX_KEYMAPS     64
+
+#define CSV_BUFFER          16384
+#define CONFONTS_DIR        "/usr/share/consolefonts"
+#define DOT_CONF            "/etc/shorkset.conf"
+#define KERNEL_VER_LEN      16
+#define KEYMAPS_DIR         "/usr/share/keymaps"
+#define MAX_FONTS           128
+#define MAX_KEYMAPS         64
+#define MAX_MODULES_ENTRY   128
+#define MODULES_CSV_PATH    "/usr/share/shorkset/modules.csv"
+#define MODULES_DIR         "/lib/modules"
 
 static const char *CFG_PATHS[] = {
     "/boot/grub/grub.cfg",
@@ -47,33 +62,41 @@ static const char *CFG_PATHS[] = {
 };
 static const int CFG_PATHS_LEN = sizeof(CFG_PATHS) / sizeof(CFG_PATHS[0]);
 extern Config CONFIG;
-static char CONFONTS[MAX_FONTS][PATH_MAX];
-static int CONFONTS_COUNT = 0;
-static const char *CONFONTS_DIR = "/usr/share/consolefonts";
-static const char *DOT_CONF = "/etc/shorkset.conf";
-static char KEYMAPS[MAX_KEYMAPS][PATH_MAX];
-static int KEYMAPS_COUNT = 0;
-static const char *KEYMAPS_DIR = "/usr/share/keymaps";
+extern char CONFONTS[MAX_FONTS][PATH_MAX];
+extern int CONFONTS_COUNT;
+extern char KERNEL_VER[KERNEL_VER_LEN];
+extern char KEYMAPS[MAX_KEYMAPS][PATH_MAX];
+extern int KEYMAPS_COUNT;
+extern ModuleEntry MODULES[MAX_MODULES_ENTRY];
+extern int MODULES_NO;
+
+
 
 void applyFontColFiles(char*);
 void applyFontColTtys(char*);
 void applyVolume(int);
 void getCurrRes(void);
+void getKernelVer(void);
 int getHWVolume(int);
 void loadConf(void);
 int loadConFonts(void);
 int loadKeymaps(void);
+int loadModules(void);
 void saveDispRes(MenuItem, int);
 void saveFontCol(MenuItem);
 void saveFontPSF(MenuItem);
 void saveKeymap(MenuItem);
 void saveVolume(MenuItem);
 void showDispResMenu(void);
+void showDriverCatsMenu(void);
+void showDriversListMenu(const char*);
 void showFontColMenu(void);
 void showFontPSFMenu(void);
 void showHelp(void);
 void showKeymapMenu(void);
 void showMainMenu(void);
+void showNetDriversMenu(void);
+void showSndDriversMenu(void);
 void showVolumeMenu(void);
 void writeConf(void);
 

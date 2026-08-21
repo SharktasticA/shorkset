@@ -1,32 +1,32 @@
-Module,Category,Type,Name
-3c509,net,ISA,3Com 3c509/3c579 EtherLink III
-3c515,net,ISA,3Com 3c515 Fast EtherLink
-3c574_cs,net,PCMCIA,3Com 3c574
-3c589_cs,net,PCMCIA,3Com 3c589
-3c59x,net,PCI,3Com 3c59x/3c900 Vortex/Boomerang
-typhoon,net,PCI,3Com 3cr990 Typhoon
-lance,net,ISA,AMD AT1500/NE2100 LANCE/PCnet
-pcnet32,net,PCI,AMD PCnet32/PCnet-FAST III
-amd8111e,net,PCI,AMD-8111 10/100 Ethernet
-axnet_cs,net,PCMCIA,Asix AX88190
-dmfe,net,PCI,Davicom DM910x/DM980x
-de2104x,net,PCI,DECchip 2104x Tulip
-tulip,net,PCI,DECchip 2114x Tulip
-fmvj18x_cs,net,PCMCIA,Fujitsu FMV-J18x
-e100,net,PCI,Intel PRO/100+
-e1000,net,PCI,Intel PRO/1000
-nmclan_cs,net,PCMCIA,New Media LAN
-ne,net,ISA,Novell NE1000/NE2000 & clones
-pcnet_cs,net,PCMCIA,Novell NE2000
-ne2k-pci,net,PCI,Novell NE2000 & clones
-ns83820,net,PCI,NS DP83820
-smc91c92_cs,net,PCMCIA,SMC 91Cxx
-epic100,net,PCI,SMC 9432 EtherPower II
-smsc9420,net,PCI,SMSC LAN9420
-uli526x,net,PCI,ULi M526x
-wd,net,ISA,Western Digital WD80x3
-winbond-840,net,PCI,Winbond W89c840
-xirc2ps_cs,net,PCMCIA,Xircom 16-bit
-xircom_cb,net,PCMCIA,Xircom Tulip
-snd-ens1370,snd,PCI,Creative Ensoniq AudioPCI 1370
-snd-ens1371,snd,PCI,Creative Ensoniq AudioPCI 1371/1373
+Name,Path,Category,Bus,Description
+3c509,kernel/drivers/net/ethernet/3com/3c509.ko.gz,net,ISA,3Com 3c509/3c579 EtherLink III
+3c515,kernel/drivers/net/ethernet/3com/3c515.ko.gz,net,ISA,3Com 3c515 Fast EtherLink
+3c574_cs,kernel/drivers/net/ethernet/3com/3c574_cs.ko.gz,net,PCMCIA,3Com 3c574
+3c589_cs,kernel/drivers/net/ethernet/3com/3c589_cs.ko.gz,net,PCMCIA,3Com 3c589
+3c59x,kernel/drivers/net/ethernet/3com/3c59x.ko.gz,net,PCI,3Com 3c59x/3c900 Vortex/Boomerang
+typhoon,kernel/drivers/net/ethernet/3com/typhoon.ko.gz,net,PCI,3Com 3cr990 Typhoon
+lance,kernel/drivers/net/ethernet/amd/lance.ko.gz,net,ISA,AMD AT1500/NE2100 LANCE/PCnet
+pcnet32,kernel/drivers/net/ethernet/amd/pcnet32.ko.gz,net,PCI,AMD PCnet32/PCnet-FAST III
+amd8111e,kernel/drivers/net/ethernet/amd/amd8111e.ko.gz,net,PCI,AMD-8111 10/100 Ethernet
+axnet_cs,kernel/drivers/net/ethernet/8390/axnet_cs.ko.gz,net,PCMCIA,Asix AX88190
+dmfe,kernel/drivers/net/ethernet/dec/tulip/dmfe.ko.gz,net,PCI,Davicom DM910x/DM980x
+de2104x,kernel/drivers/net/ethernet/dec/tulip/de2104x.ko.gz,net,PCI,DECchip 2104x Tulip
+tulip,kernel/drivers/net/ethernet/dec/tulip/tulip.ko.gz,net,PCI,DECchip 2114x Tulip
+fmvj18x_cs,kernel/drivers/net/ethernet/fujitsu/fmvj18x_cs.ko.gz,net,PCMCIA,Fujitsu FMV-J18x
+e100,kernel/drivers/net/ethernet/intel/e100.ko.gz,net,PCI,Intel PRO/100+
+e1000,kernel/drivers/net/ethernet/intel/e1000/e1000.ko.gz,net,PCI,Intel PRO/1000
+nmclan_cs,kernel/drivers/net/ethernet/amd/nmclan_cs.ko.gz,net,PCMCIA,New Media LAN
+ne,kernel/drivers/net/ethernet/8390/ne.ko.gz,net,ISA,Novell NE1000/NE2000 & clones
+pcnet_cs,kernel/drivers/net/ethernet/8390/pcnet_cs.ko.gz,net,PCMCIA,Novell NE2000
+ne2k-pci,kernel/drivers/net/ethernet/8390/ne2k-pci.ko.gz,net,PCI,Novell NE2000 & clones
+ns83820,kernel/drivers/net/ethernet/natsemi/ns83820.ko.gz,net,PCI,NS DP83820
+smc91c92_cs,kernel/drivers/net/ethernet/smsc/smc91c92_cs.ko.gz,net,PCMCIA,SMC 91Cxx
+epic100,kernel/drivers/net/ethernet/smsc/epic100.ko.gz,net,PCI,SMC 9432 EtherPower II
+smsc9420,kernel/drivers/net/ethernet/smsc/smsc9420.ko.gz,net,PCI,SMSC LAN9420
+uli526x,kernel/drivers/net/ethernet/dec/tulip/uli526x.ko.gz,net,PCI,ULi M526x
+wd,kernel/drivers/net/ethernet/8390/wd.ko.gz,net,ISA,Western Digital WD80x3
+winbond-840,kernel/drivers/net/ethernet/dec/tulip/winbond-840.ko.gz,net,PCI,Winbond W89c840
+xirc2ps_cs,kernel/drivers/net/ethernet/xircom/xirc2ps_cs.ko.gz,net,PCMCIA,Xircom 16-bit
+xircom_cb,kernel/drivers/net/ethernet/dec/tulip/xircom_cb.ko.gz,net,PCMCIA,Xircom Tulip
+snd-ens1370,kernel/sound/pci/snd-ens1370.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1370
+snd-ens1371,kernel/sound/pci/snd-ens1371.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1371/1373

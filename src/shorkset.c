@@ -27,11 +27,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
+#include <sys/utsname.h>
 
 
 
 Config CONFIG = { 3840, "white", "0;37", "default", "en_us", 40 };
+char CONFONTS[MAX_FONTS][PATH_MAX] = {0};
+int CONFONTS_COUNT = 0;
+char KERNEL_VER[KERNEL_VER_LEN] = {0};
+char KEYMAPS[MAX_KEYMAPS][PATH_MAX] = {0};
+int KEYMAPS_COUNT = 0;
+int IS_NET_MODULES = 0;
+int IS_SND_MODULES = 0;
+ModuleEntry MODULES[MAX_MODULES_ENTRY] = {0};
+int MODULES_NO;
 
 
 
@@ -169,6 +180,22 @@ void getCurrRes(void)
         EXIT_MSG = strdup("ERROR: unable to determine the current resolution from bootloader configuration file");
         exit(1);
     }
+}
+
+/**
+ * Loads the Linux kernel version into KERNEL_VER.
+ */
+void getKernelVer(void)
+{
+    struct utsname un;
+    if (uname(&un) != 0)
+    {
+        EXIT_MSG = strdup("ERROR: could not get Linux kernel version");
+        exit(1);
+    }
+
+    strncpy(KERNEL_VER, un.release, KERNEL_VER_LEN - 1);
+    KERNEL_VER[KERNEL_VER_LEN - 1] = '\0';
 }
 
 /**
@@ -315,6 +342,83 @@ int loadKeymaps(void)
 
     qsort(KEYMAPS, KEYMAPS_COUNT, PATH_MAX, natCmp);
     return KEYMAPS_COUNT > 0;
+}
+
+/**
+ * Loads the contents of modules.csv into MODULES.
+ * @returns Number of program entries loaded; -1 if error
+ */
+int loadModules(void)
+{
+    // Load csv file
+    FILE *stream;
+    if (fileExists(MODULES_CSV_PATH))
+        stream = fopen(MODULES_CSV_PATH, "r");
+    else
+        return -1;
+
+    // Load csv into buffer
+    static char buffer[CSV_BUFFER];
+    size_t n = fread(buffer, 1, sizeof(buffer) - 1, stream);
+    fclose(stream);
+    buffer[n] = '\0';
+
+    char *p = buffer;
+
+    // Skip header line
+    while (*p && *p != '\n')
+        p++;
+    if (*p == '\n')
+        p++;
+
+    int i = 0;
+    while (*p && i < MAX_MODULES_ENTRY)
+    {
+        char *line = p;
+
+        // Find end of line
+        while (*p && *p != '\n')
+            p++;
+        if (*p == '\n')
+        {
+            *p = '\0';
+            p++;
+        }
+
+        if (*line == '\0')
+            continue;
+
+        // Load line
+        char *fields[5];
+        int fieldCount = loadCSVLine(line, fields, 5);
+
+        // Check if malformed line/parsing
+        if (fieldCount < 5)
+            continue;
+
+        char modulePath[PATH_MAX];
+        snprintf(modulePath, PATH_MAX, "%s/%s/%s", MODULES_DIR, KERNEL_VER,
+            fields[1]);
+
+        if (fileExists(modulePath))
+        {
+            // Input line into entries
+            MODULES[i].name = fields[0];
+            MODULES[i].category = fields[2];
+            MODULES[i].bus = fields[3];
+            MODULES[i].description = fields[4];
+
+            // Flag which driver categories were sound
+            if (!IS_NET_MODULES && strcmp(fields[2], "net") == 0)
+                IS_NET_MODULES = 1;
+            else if (!IS_SND_MODULES && strcmp(fields[2], "snd") == 0)
+                IS_SND_MODULES = 1;
+            i++;
+        }
+
+    }
+
+    return i;
 }
 
 /**
@@ -663,9 +767,217 @@ void showDispResMenu(void)
             case INVALID:
                 fullRedraw = 0;
                 break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
         }
     }
 
+    clearScreen();
+}
+
+/**
+ * Displays driver category selection menu
+ */
+void showDriverCatsMenu(void)
+{
+    MenuItem rawMenu[] = {
+        {
+            "net", "Network interface", NULL, showNetDriversMenu,
+            IS_NET_MODULES, 0
+        },
+        {
+            "snd", "Sound card", NULL, showSndDriversMenu,
+            IS_SND_MODULES, 0
+        }
+    };
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int menuSize = 0;
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isVisible)
+            menu[menuSize++] = rawMenu[i];
+    freeMenu(rawMenu, rawMenuSize);
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Select driver category");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                clearScreen();
+                menu[cursorY - 1].action();
+                break;
+        
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
+}
+/**
+ * Displays drivers list selection menu
+ * @param cat Driver category to filter the given list to
+ */
+void showDriversListMenu(const char *cat)
+{
+    // Create a menu containing modules for the given cat
+    MenuItem menu[MODULES_NO];
+    int menuSize = 0;
+    for (int i = 0; i < MODULES_NO; i++)
+    {
+        if (strcmp(MODULES[i].category, cat) == 0)
+        {
+            snprintf(menu[menuSize].id, sizeof(menu[i].id), "%s",
+                MODULES[i].name);
+            snprintf(menu[menuSize].name, sizeof(menu[i].name), "%s (%s)",
+                MODULES[i].description, MODULES[i].bus);
+            menu[menuSize].payload = NULL;
+            menu[menuSize].action = NULL;
+            menu[menuSize].isVisible = 1;
+            menu[menuSize].isStatic = 0;
+            menuSize++;
+        }
+    }
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    char title[32] = {0};
+    char msg[200] = {0};
+    if (strcmp(cat, "net") == 0)
+    {
+        snprintf(title, 32, "Toggle network interface driver");
+        snprintf(msg, 200, "Any driver marked with \"*\" is currently "
+            "loaded. You may load multiple network interface drivers.");
+    }
+    else if (strcmp(cat, "snd") == 0)
+    {
+        snprintf(title, 32, "Toggle sound card driver");
+        snprintf(msg, 200, "A driver marked with \"*\" is currently "
+            "loaded. You may only load one sound card driver at a time. "
+            "Loading a driver whilst another is loaded will unload the "
+            "latter.");
+    }
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader(title);
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Quit");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                clearScreen();
+                break;
+        
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    freeMenu(menu, menuSize);
     clearScreen();
 }
 
@@ -781,6 +1093,10 @@ void showFontColMenu(void)
 
             case INVALID:
                 fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
                 break;
         }
     }
@@ -914,6 +1230,10 @@ void showFontPSFMenu(void)
 
             case INVALID:
                 fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
                 break;
         }
     }
@@ -1079,6 +1399,10 @@ void showKeymapMenu(void)
             case INVALID:
                 fullRedraw = 0;
                 break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
         }
     }
 
@@ -1092,23 +1416,56 @@ void showMainMenu(void)
 {
     setupMenuSys();
 
-    if (TERM_SIZE.ws_col < 40 || TERM_SIZE.ws_row < 10)
-    {
-        EXIT_MSG = "ERROR: terminal size too small (must be 40x10 or larger)\n";
-        exit(1);
-    }
-
     loadConf();
     // Whilst loadConf should provide the current resolution, we will still
     // check the bootloader conf in case of a manual edit
     getCurrRes();
+    getKernelVer();
+    MODULES_NO = loadModules();
 
     MenuItem rawMenu[] = {
-        { "res",    "Display resolution",   "", showDispResMenu,    1                               },
-        { "kmp",    "Keyboard layout",      "", showKeymapMenu,     loadKeymaps()                   },
-        { "psf",    "Font (PSF)",           "", showFontPSFMenu,    loadConFonts()                  },
-        { "col",    "Font colour",          "", showFontColMenu,    1                               },
-        { "vol",    "Volume",               "", showVolumeMenu,     access("/dev/dsp", F_OK) == 0   }
+        { 
+            "res",
+            "Display resolution",
+            "",
+            showDispResMenu,
+            1
+        },
+        {
+            "drv",
+            "Drivers",
+            "",
+            showDriverCatsMenu,
+            IS_NET_MODULES || IS_SND_MODULES
+        },
+        {
+            "lay", 
+            "Keyboard layout",
+            "",
+            showKeymapMenu,
+            loadKeymaps()
+        },
+        {
+            "psf",
+            "Font (PSF)",
+            "",
+            showFontPSFMenu,
+            loadConFonts()
+        },
+        {
+            "col",
+            "Font colour",
+            "",
+            showFontColMenu,
+            1
+        },
+        {
+            "vol",
+            "Volume",
+            "",
+            showVolumeMenu,
+            access("/dev/dsp", F_OK) == 0
+        }
     };
     int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
 
@@ -1177,10 +1534,24 @@ void showMainMenu(void)
             case INVALID:
                 fullRedraw = 0;
                 break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
         }
     }
 
     clearScreen();
+}
+
+void showNetDriversMenu(void)
+{
+    showDriversListMenu("net");
+}
+
+void showSndDriversMenu(void)
+{
+    showDriversListMenu("snd");
 }
 
 /**
@@ -1294,6 +1665,10 @@ void showVolumeMenu(void)
 
             case INVALID:
                 fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
                 break;
         }
     }

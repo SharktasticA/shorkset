@@ -483,7 +483,7 @@ void printMenu(MenuItem *menu, int menuSize, char *msg, int cols, int colWidth, 
         if (adjustedBaseRow < 1) adjustedBaseRow = 1;
 
         // Print message
-        if (cursorYPrev == 0)
+        if (*cursorYPrev == 0)
         {
             char *currPos = msgBuffer;
             for (int i = 0; i < msgLines; i++)
@@ -716,7 +716,7 @@ int printYesNoScreen(char *title, char *prompt)
     int running = 1;
     int cursorX = 1;
     int cursorY = 2;
-    int cursorXPrev = 0;
+    int cursorXPrev = 1;
     int cursorYPrev = 0;
     int fullRedraw = 1;
 
