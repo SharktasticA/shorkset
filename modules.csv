@@ -16,9 +16,9 @@ fmvj18x_cs,kernel/drivers/net/ethernet/fujitsu/fmvj18x_cs.ko.gz,net,PCMCIA,Fujit
 e100,kernel/drivers/net/ethernet/intel/e100.ko.gz,net,PCI,Intel PRO/100+
 e1000,kernel/drivers/net/ethernet/intel/e1000/e1000.ko.gz,net,PCI,Intel PRO/1000
 nmclan_cs,kernel/drivers/net/ethernet/amd/nmclan_cs.ko.gz,net,PCMCIA,New Media LAN
-ne,kernel/drivers/net/ethernet/8390/ne.ko.gz,net,ISA,Novell NE1000/NE2000 & clones
+ne,kernel/drivers/net/ethernet/8390/ne.ko.gz,net,ISA,Novell NE1000/NE2000
 pcnet_cs,kernel/drivers/net/ethernet/8390/pcnet_cs.ko.gz,net,PCMCIA,Novell NE2000
-ne2k_pci,kernel/drivers/net/ethernet/8390/ne2k-pci.ko.gz,net,PCI,Novell NE2000 & clones
+ne2k_pci,kernel/drivers/net/ethernet/8390/ne2k-pci.ko.gz,net,PCI,Novell NE2000
 ns83820,kernel/drivers/net/ethernet/natsemi/ns83820.ko.gz,net,PCI,NS DP83820
 smc91c92_cs,kernel/drivers/net/ethernet/smsc/smc91c92_cs.ko.gz,net,PCMCIA,SMC 91Cxx
 epic100,kernel/drivers/net/ethernet/smsc/epic100.ko.gz,net,PCI,SMC 9432 EtherPower II
@@ -28,5 +28,27 @@ wd,kernel/drivers/net/ethernet/8390/wd.ko.gz,net,ISA,Western Digital WD80x3
 winbond_840,kernel/drivers/net/ethernet/dec/tulip/winbond-840.ko.gz,net,PCI,Winbond W89c840
 xirc2ps_cs,kernel/drivers/net/ethernet/xircom/xirc2ps_cs.ko.gz,net,PCMCIA,Xircom 16-bit
 xircom_cb,kernel/drivers/net/ethernet/dec/tulip/xircom_cb.ko.gz,net,PCMCIA,Xircom Tulip
+snd_adlib,kernel/sound/isa/snd-adlib.ko.gz,snd,ISA,AdLib Music Synthesizer
+snd_ad1848,kernel/sound/isa/ad1848/snd-ad1848.ko.gz,snd,ISA,Analog Devices AD1848 & Cirrus Logic CS4248
+snd_atiixp,kernel/sound/pci/snd-atiixp.ko.gz,snd,PCI,ATI IXP AC97
+snd_als4000,kernel/sound/pci/snd-als4000.ko.gz,snd,PCI,Avance Logic ALS4000
+snd_cmipci,kernel/sound/pci/snd-cmipci.ko.gz,snd,PCI,C-Media CMI8338/8738/8768/8770
+snd_cs4231,kernel/sound/isa/cs423x/snd-cs4231.ko.gz,snd,ISA,Cirrus Logic CS4231
+snd_cs4236,kernel/sound/isa/cs423x/snd-cs4236.ko.gz,snd,ISA,Cirrus Logic CS4232/4236+
+snd_cs46xx,kernel/sound/pci/cs46xx/snd-cs46xx.ko.gz,snd,PCI,Cirrus Logic CS4280/46xx
+snd_cs4281,kernel/sound/pci/snd-cs4281.ko.gz,snd,PCI,Cirrus Logic CS4281
 snd_ens1370,kernel/sound/pci/snd-ens1370.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1370
 snd_ens1371,kernel/sound/pci/snd-ens1371.ko.gz,snd,PCI,Creative Ensoniq AudioPCI 1371/1373
+snd_sb8,kernel/sound/isa/sb/snd-sb8.ko.gz,snd,ISA,Creative Sound Blaster 1.0/2.0/Pro
+snd_sb16,kernel/sound/isa/sb/snd-sb16.ko.gz,snd,ISA,Creative Sound Blaster 16
+snd_sbawe,kernel/sound/isa/sb/snd-sbawe.ko.gz,snd,ISA,Creative Sound Blaster AWE32/64
+snd_es18xx,kernel/sound/isa/snd-es18xx.ko.gz,snd,ISA,ESS ES18xx
+snd_es1688,kernel/sound/isa/es1688/snd-es1688.ko.gz,snd,ISA,ESS ES688/1688 & ES968 PnP
+snd_gusclassic,kernel/sound/isa/gus/snd-gusclassic.ko.gz,snd,ISA,Gravis UltraSound Classic
+snd_gusextreme,kernel/sound/isa/gus/snd-gusextreme.ko.gz,snd,ISA,Gravis UltraSound Extreme
+snd_gusmax,kernel/sound/isa/gus/snd-gusmax.ko.gz,snd,ISA,Gravis UltraSound MAX
+snd_intel8x0,kernel/sound/pci/snd-intel8x0.ko.gz,snd,PCI,Intel/SiS/nVidia/AMD AC97 & ALi M5455
+snd_jazz16,kernel/sound/isa/sb/snd-jazz16.ko.gz,snd,ISA,Media Vision Jazz16
+snd_nm256,kernel/sound/pci/nm256/snd-nm256.ko.gz,snd,PCI,NeoMagic NM256AV/ZX
+snd_opl3sa2,kernel/sound/isa/snd-opl3sa2.ko.gz,snd,ISA,Yamaha OPL3-SA2/SA3
+snd_ymfpci,kernel/sound/pci/ymfpci/snd-ymfpci.ko.gz,snd,PCI,Yamaha YMF724/740/744/754
