@@ -5,6 +5,8 @@
     ## General, utility functions for SHORK Utilities & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
+    ## Revision A                                       ##
+    ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
     ## Kali (links.sharktastica.co.uk)                  ##

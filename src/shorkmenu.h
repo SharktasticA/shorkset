@@ -5,6 +5,8 @@
     ## An interactive menu system for SHORK UTILITIES & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
+    ## Revision A                                       ##
+    ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
     ## Kali (sharktastica.co.uk)                        ##
@@ -48,6 +50,8 @@ typedef struct
 
 extern int AVAIL_HEIGHT;
 extern int BASE_ROW;
+extern char *COL_BAK_BAR;
+extern char *COL_BAK_MENU_MSG;
 extern int COL_ENABLED;
 extern char *COL_FOR_ARROW;
 extern char *COL_FOR_CODE;
