@@ -5,25 +5,48 @@ Name,Path,Category,Bus,Description
 3c589_cs,kernel/drivers/net/ethernet/3com/3c589_cs.ko.gz,net,PCMCIA,3Com 3c589
 3c59x,kernel/drivers/net/ethernet/3com/3c59x.ko.gz,net,PCI,3Com 3c59x/3c900 Vortex/Boomerang
 typhoon,kernel/drivers/net/ethernet/3com/typhoon.ko.gz,net,PCI,3Com 3cr990 Typhoon
+starfire,kernel/drivers/net/ethernet/adaptec/starfire.ko.gz,net,PCI,Adaptec Starfire
 lance,kernel/drivers/net/ethernet/amd/lance.ko.gz,net,ISA,AMD AT1500/NE2100 LANCE/PCnet
 pcnet32,kernel/drivers/net/ethernet/amd/pcnet32.ko.gz,net,PCI,AMD PCnet32/PCnet-FAST III
-amd8111e,kernel/drivers/net/ethernet/amd/amd8111e.ko.gz,net,PCI,AMD-8111 10/100 Ethernet
+amd8111e,kernel/drivers/net/ethernet/amd/amd8111e.ko.gz,net,PCI,AMD-8111
 axnet_cs,kernel/drivers/net/ethernet/8390/axnet_cs.ko.gz,net,PCMCIA,Asix AX88190
+b44,kernel/drivers/net/ethernet/broadcom/b44.ko.gz,net,PCI,Broadcom BCM440x/47xx
+tg3,kernel/drivers/net/ethernet/broadcom/tg3.ko.gz,net,PCI,Broadcom Tigon3
+bnx2,kernel/drivers/net/ethernet/broadcom/bnx2.ko.gz,net,PCI,Broadcom/QLogic NetXtreme II BCM5706/5708/5709/5716
+dl2k,kernel/drivers/net/ethernet/dlink/dl2k.ko.gz,net,PCI,D-Link DL2000
 dmfe,kernel/drivers/net/ethernet/dec/tulip/dmfe.ko.gz,net,PCI,Davicom DM910x/DM980x
 de2104x,kernel/drivers/net/ethernet/dec/tulip/de2104x.ko.gz,net,PCI,DECchip 2104x Tulip
 tulip,kernel/drivers/net/ethernet/dec/tulip/tulip.ko.gz,net,PCI,DECchip 2114x Tulip
 fmvj18x_cs,kernel/drivers/net/ethernet/fujitsu/fmvj18x_cs.ko.gz,net,PCMCIA,Fujitsu FMV-J18x
 e100,kernel/drivers/net/ethernet/intel/e100.ko.gz,net,PCI,Intel PRO/100+
 e1000,kernel/drivers/net/ethernet/intel/e1000/e1000.ko.gz,net,PCI,Intel PRO/1000
+skge,kernel/drivers/net/ethernet/marvell/skge.ko.gz,net,PCI,Marvell Yukon
+ksz884x,kernel/drivers/net/ethernet/micrel/ksz884x.ko.gz,net,PCI,Micrel KSZ8841/2
+fealnx,kernel/drivers/net/ethernet/fealnx.ko.gz,net,PCI,Myson MTD-8xx
+natsemi,kernel/drivers/net/ethernet/natsemi/natsemi.ko.gz,net,PCI,National Semiconductor DP8381x
+ns83820,kernel/drivers/net/ethernet/natsemi/ns83820.ko.gz,net,PCI,National Semiconductor DP83820
 nmclan_cs,kernel/drivers/net/ethernet/amd/nmclan_cs.ko.gz,net,PCMCIA,New Media LAN
 ne,kernel/drivers/net/ethernet/8390/ne.ko.gz,net,ISA,Novell NE1000/NE2000
-pcnet_cs,kernel/drivers/net/ethernet/8390/pcnet_cs.ko.gz,net,PCMCIA,Novell NE2000
 ne2k_pci,kernel/drivers/net/ethernet/8390/ne2k-pci.ko.gz,net,PCI,Novell NE2000
-ns83820,kernel/drivers/net/ethernet/natsemi/ns83820.ko.gz,net,PCI,NS DP83820
+pcnet_cs,kernel/drivers/net/ethernet/8390/pcnet_cs.ko.gz,net,PCMCIA,Novell NE2000
+forcedeth,kernel/drivers/net/ethernet/nvidia/forcedeth.ko.gz,net,PCI,NVIDIA nForce Integrated Ethernet
+r6040,kernel/drivers/net/ethernet/rdc/r6040.ko.gz,net,PCI,RDC R6040
+r8169,kernel/drivers/net/ethernet/realtek/r8169.ko.gz,net,PCI,Realtek RTL8101/8125/8168/8169
+8139too,kernel/drivers/net/ethernet/realtek/8139too.ko.gz,net,PCI,Realtek RTL8139
+8139cp,kernel/drivers/net/ethernet/realtek/8139cp.ko.gz,net,PCI,Realtek RTL8139C+
+sc92031,kernel/drivers/net/ethernet/silan/sc92031.ko.gz,net,PCI,Silan SC92031
+sis190,kernel/drivers/net/ethernet/sis/sis190.ko.gz,net,PCI,SiS 190/191
+sis900,kernel/drivers/net/ethernet/sis/sis900.ko.gz,net,PCI,SiS 900/7016
 smc91c92_cs,kernel/drivers/net/ethernet/smsc/smc91c92_cs.ko.gz,net,PCMCIA,SMC 91Cxx
 epic100,kernel/drivers/net/ethernet/smsc/epic100.ko.gz,net,PCI,SMC 9432 EtherPower II
+smc_ultra,kernel/drivers/net/ethernet/8390/smc-ultra.ko.gz,net,ISA,SMC Ultra/EtherEZ
 smsc9420,kernel/drivers/net/ethernet/smsc/smsc9420.ko.gz,net,PCI,SMSC LAN9420
+sunhme,kernel/drivers/net/ethernet/sun/sunhme.ko.gz,net,PCI,Sun Happy Meal
+sundance,kernel/drivers/net/ethernet/dlink/sundance.ko.gz,net,PCI,Sundance ST201
+tlan,kernel/drivers/net/ethernet/ti/tlan.ko.gz,net,PCI,Texas Instruments ThunderLAN
 uli526x,kernel/drivers/net/ethernet/dec/tulip/uli526x.ko.gz,net,PCI,ULi M526x
+via_rhine,kernel/drivers/net/ethernet/via/via-rhine.ko.gz,net,PCI,VIA Rhine
+via_velocity,kernel/drivers/net/ethernet/via/via-velocity.ko.gz,net,PCI,VIA Velocity
 wd,kernel/drivers/net/ethernet/8390/wd.ko.gz,net,ISA,Western Digital WD80x3
 winbond_840,kernel/drivers/net/ethernet/dec/tulip/winbond-840.ko.gz,net,PCI,Winbond W89c840
 xirc2ps_cs,kernel/drivers/net/ethernet/xircom/xirc2ps_cs.ko.gz,net,PCMCIA,Xircom 16-bit
