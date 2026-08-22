@@ -5,7 +5,7 @@
     ## An interactive menu system for SHORK UTILITIES & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision A                                       ##
+    ## Revision B                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -651,6 +651,7 @@ void printMenu(MenuItem *menu, int menuSize, char *msg, int cols, int colWidth, 
  */
 void printTextScreen(char *title, char *text, int totalLines, int pageScroll)
 {
+    clearScreen();
     printHeader(title);
     printFooter("[jk] Scroll [q] Back");
 

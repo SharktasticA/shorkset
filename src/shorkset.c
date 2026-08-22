@@ -557,8 +557,12 @@ void saveDispRes(MenuItem itm, int skipMsg)
         char msgTitle[80];
         snprintf(msgTitle, 80, "%s", itm.name);
         char msgBody[320] = "The selected display resolution has been saved. If you selected a VGA resolution and had selected a PSF font before, the latter setting will now be discarded as PSF fonts dictate their own VGA resolution. A system restart is required before the changes will take effect.";
-        int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-        printTextScreen(msgTitle, msgBody, lines, 1);
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
+            0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
     }
 }
 
@@ -578,8 +582,11 @@ void saveFontCol(MenuItem itm)
     char msgTitle[80];
     snprintf(msgTitle, 80, "%s", itm.payload);
     char msgBody[320] = "The selected font colour has been saved and will be applied once you exit SHORKSET. If there are any other active virtual terminals (ttyX), you may need to enter \"exit\" when convenient, or restart your computer before this change will take complete effect.";
-    int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-    printTextScreen(msgTitle, msgBody, lines, 1);
+
+    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
+    printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+    free(wrapped->str);
+    free(wrapped);
 }
 
 /**
@@ -595,8 +602,12 @@ void saveFontPSF(MenuItem itm)
         
         char msgTitle[80] = "default";
         char msgBody[320] = "The PSF font will be reset to default. If a PSF font other than \"default\" was previously selected, you must restart your computer before this change will take effect.";
-        int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-        printTextScreen(msgTitle, msgBody, lines, 1);
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
+            0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
     }
     else
     {
@@ -618,8 +629,12 @@ void saveFontPSF(MenuItem itm)
         char msgTitle[80];
         snprintf(msgTitle, 80, "%s", itm.name);
         char msgBody[320] = "The selected PSF font has been saved and will be applied once you exit SHORKSET. If you had selected a VGA display resolution before, that setting will now be discarded as the PSF font will dictate its own VGA resolution. VBE display resolutions are unaffected.";
-        int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-        printTextScreen(msgTitle, msgBody, lines, 1);
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
+            0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
     }
 }
 
@@ -639,8 +654,11 @@ void saveKeymap(MenuItem itm)
     char msgTitle[80];
     snprintf(msgTitle, 80, "%s", itm.name);
     char msgBody[320] = "The selected keyboard layout has been applied.";
-    int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-    printTextScreen(msgTitle, msgBody, lines, 1);
+
+    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
+    printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+    free(wrapped->str);
+    free(wrapped);
 }
 
 /**
@@ -656,8 +674,11 @@ void saveVolume(MenuItem itm)
     /*char msgTitle[80];
     snprintf(msgTitle, 80, "%s", itm.name);
     char msgBody[320] = "The selected volume level has been applied.";
-    int lines = formatNewLines(msgBody, TERM_SIZE.ws_col, NULL, 0);
-    printTextScreen(msgTitle, msgBody, lines, 1);*/
+
+    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
+    printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+    free(wrapped->str);
+    free(wrapped);*/
 }
 
 /**
@@ -1796,9 +1817,24 @@ void toggleDriver(const char *id)
         int result = runCmd("modprobe", id, NULL);
         if (result != 0)
         {
-            EXIT_MSG = strdup("ERROR: could not run modprobe to load "
-                "driver module");
-            exit(1);
+            tcflush(STDIN_FILENO, TCIFLUSH);
+
+            char msgTitle[80];
+            snprintf(msgTitle, 80, "Could not load driver");
+            char msgBody[480] = "The selected driver's Linux module could "
+            "not be loaded. This likely means the hardware it targets is "
+            "not present or addressable, and the module could not load "
+            "without it. Please ensure the target hardware is properly "
+            "connected when it is safe to do so, or that you are trying "
+            "the correct driver.";
+
+            WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+                NULL, 0, 0);
+            printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+            free(wrapped->str);
+            free(wrapped);
+
+            return;
         }
         csvAppend(CONFIG.modules, sizeof(CONFIG.modules), id);
     }
