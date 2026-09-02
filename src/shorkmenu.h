@@ -5,7 +5,7 @@
     ## An interactive menu system for SHORK UTILITIES & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision B                                       ##
+    ## Revision C                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -23,6 +23,12 @@
 
 
 
+#define DT_EXE              100
+#define MENU_ITEM_ID_LEN    80
+#define MENU_ITEM_NAME_LEN  80
+
+
+
 typedef enum 
 {
     CURSOR_DOWN,
@@ -36,8 +42,8 @@ typedef enum
 
 typedef struct 
 {
-    char id[80];
-    char name[80];
+    char id[MENU_ITEM_ID_LEN];
+    char name[MENU_ITEM_NAME_LEN];
     char *payload;
     void (*action)(void);
     int isVisible;
@@ -46,7 +52,6 @@ typedef struct
 
 
 
-#define DT_EXE  100
 
 extern int AVAIL_HEIGHT;
 extern int BASE_ROW;
@@ -75,6 +80,7 @@ void enableRawMode(void);
 void freeMenu(MenuItem*, int);
 int getIntInput(char*, int, int, int);
 NavInput getNavInput(void);
+void markEntry(char*, const char*, const int);
 void onExit(void);
 void onSigInt(int);
 void printDir(struct dirent**, int, int, int);
@@ -88,5 +94,6 @@ void setupMenuSys(void);
 void setupViewport(void);
 void showCursor(void);
 void showDialog(char*, int);
+void unmarkEntry(char*);
 
 #endif

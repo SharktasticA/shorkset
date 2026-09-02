@@ -5,7 +5,7 @@
     ## An interactive menu system for SHORK UTILITIES & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision B                                       ##
+    ## Revision C                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -206,6 +206,27 @@ NavInput getNavInput(void)
     }
 
     return INVALID;
+}
+
+/**
+ * Adds a leading "*" and ANSI colour escape code to "mark" a menu entry.
+ * @param name Menu entry name
+ * @param col Desired colour to add
+ * @param noAst Flags if to skip adding the leading asterisk
+ */
+void markEntry(char *name, const char *col, const int noAst)
+{
+    if (name[0] != '\x1b')
+    {
+        char buffer[MENU_ITEM_NAME_LEN];
+        if (noAst)
+            snprintf(buffer, MENU_ITEM_NAME_LEN, "\x1b[%sm%s\x1b[0m", col,
+                name);
+        else
+            snprintf(buffer, MENU_ITEM_NAME_LEN, "\x1b[%sm*%s\x1b[0m", col,
+                name);
+        strcpy(name, buffer);
+    }
 }
 
 /**
@@ -933,4 +954,24 @@ void showDialog(char *message, int width)
     // Reset console colour
     if (COL_ENABLED)
         printf("\033[%sm", COL_RESET);
+}
+
+/**
+ * Removes a leading "*" and ANSI colour escape code to "ummark" a menu
+ * entry.
+ * @param name Menu entry name
+ */
+void unmarkEntry(char *name)
+{
+    if (name[0] == '\x1b')
+    {
+        char *ast = strchr(name, '*');
+        if (ast)
+        {
+            char *rst = strstr(ast, "\x1b[0m");
+            size_t len = rst ? (size_t)(rst - (ast + 1)) : strlen(ast + 1);
+            memmove(name, ast + 1, len);
+            name[len] = '\0';
+        }
+    }
 }

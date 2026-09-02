@@ -19,6 +19,8 @@
 #include "vbe.h"
 
 #include <fcntl.h>
+#include <net/if.h>
+#include <ifaddrs.h>
 #include <sys/ioctl.h>
 #include <libgen.h>
 #include <linux/limits.h>
@@ -34,7 +36,18 @@
 
 
 
-Config CONFIG = { 3840, "white", "0;37", "default", "en_us", "", 40 };
+Config CONFIG = {
+    3840,
+    "white",
+    "0;37",
+    "default",
+    "en_us",
+    "",
+    0,
+    "",
+    40
+};
+
 char CONFONTS[MAX_FONTS][PATH_MAX] = {0};
 int CONFONTS_COUNT = 0;
 char KERNEL_VER[KERNEL_VER_LEN] = {0};
@@ -43,7 +56,9 @@ int KEYMAPS_COUNT = 0;
 int IS_NET_MODULES = 0;
 int IS_SND_MODULES = 0;
 ModuleEntry MODULES[MAX_MODULES_ENTRIES] = {0};
-int MODULES_NO;
+int MODULES_NO = 0;
+NetIfEntry NET_IFS[MAX_NET_IFS_ENTRIES] = {0};
+int NET_IFS_NO = 0;
 
 
 
@@ -227,7 +242,7 @@ LoadedModules getLoadedModules(void)
             continue;
 
         size_t len = strlen(name);
-        if (len >= MAX_MODULE_NAME_LEN)
+        if (len >= MODULE_NAME_LEN)
             continue;
 
         strcpy(result.modules[result.count], name);
@@ -286,19 +301,31 @@ void loadConf(void)
             if (strncmp(buffer, "DISP_RES=", 9) == 0)
                 CONFIG.dispRes = atoi(value);
             else if (strncmp(buffer, "FONT_COL_NAME=", 14) == 0)
-                snprintf(CONFIG.fontColName, sizeof(CONFIG.fontColName), "%s", value);
+                snprintf(CONFIG.fontColName, CONFIG_FONT_COL_NAME_LEN, "%s", value);
             else if (strncmp(buffer, "FONT_COL_ANSI=", 14) == 0)
-                snprintf(CONFIG.fontColANSI, sizeof(CONFIG.fontColANSI), "%s", value);
+                snprintf(CONFIG.fontColANSI, CONFIG_FONT_COL_ANSI_LEN, "%s", value);
             else if (strncmp(buffer, "FONT_PSF=", 9) == 0)
-                snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "%s", value);
+                snprintf(CONFIG.fontPSF, PATH_MAX, "%s", value);
             else if (strncmp(buffer, "KEYMAP=", 7) == 0)
-                snprintf(CONFIG.keymap, sizeof(CONFIG.keymap), "%s", value);
+                snprintf(CONFIG.keymap, PATH_MAX, "%s", value);
             else if (strncmp(buffer, "MODULES=", 7) == 0)
-                snprintf(CONFIG.modules, sizeof(CONFIG.modules), "%s", value);
+                snprintf(CONFIG.modules, CONFIG_MODULES_LEN, "%s", value);
+            else if (strncmp(buffer, "NET_ENABLED=", 12) == 0)
+                CONFIG.netEnabled = atoi(value);
+            else if (strncmp(buffer, "NET_IFS=", 8) == 0)
+                snprintf(CONFIG.netIfs, CONFIG_NET_IFS_LEN, "%s", value);
             else if (strncmp(buffer, "VOLUME=", 7) == 0)
                 CONFIG.volume = atoi(value);
         }
         fclose(stream);
+
+        // Validate integer values and reset to default if needed
+        if (CONFIG.dispRes < 0)
+            CONFIG.dispRes = 3840;
+        if (CONFIG.netEnabled != 0 && CONFIG.netEnabled != 1)
+            CONFIG.netEnabled = 0;
+        if (CONFIG.volume < 0 || CONFIG.volume > 100)
+            CONFIG.volume = 40;
     }
     else
     {
@@ -387,7 +414,7 @@ int loadKeymaps(void)
 
 /**
  * Loads the contents of modules.csv into MODULES.
- * @returns Number of program entries loaded; -1 if error
+ * @returns 1 if successful; 0 if not
  */
 int loadModules(void)
 {
@@ -396,7 +423,7 @@ int loadModules(void)
     if (fileExists(MODULES_CSV_PATH))
         stream = fopen(MODULES_CSV_PATH, "r");
     else
-        return -1;
+        return 0;
 
     // Load csv into buffer
     static char buffer[CSV_BUFFER];
@@ -412,8 +439,8 @@ int loadModules(void)
     if (*p == '\n')
         p++;
 
-    int i = 0;
-    while (*p && i < MAX_MODULES_ENTRIES)
+    MODULES_NO = 0;
+    while (*p && MODULES_NO < MAX_MODULES_ENTRIES)
     {
         char *line = p;
 
@@ -444,22 +471,80 @@ int loadModules(void)
         if (fileExists(modulePath))
         {
             // Input line into entries
-            MODULES[i].name = fields[0];
-            MODULES[i].category = fields[2];
-            MODULES[i].bus = fields[3];
-            MODULES[i].description = fields[4];
+            MODULES[MODULES_NO].name = fields[0];
+            MODULES[MODULES_NO].category = fields[2];
+            MODULES[MODULES_NO].bus = fields[3];
+            MODULES[MODULES_NO].description = fields[4];
 
             // Flag which driver categories were sound
             if (!IS_NET_MODULES && strcmp(fields[2], "net") == 0)
                 IS_NET_MODULES = 1;
             else if (!IS_SND_MODULES && strcmp(fields[2], "snd") == 0)
                 IS_SND_MODULES = 1;
-            i++;
+            MODULES_NO++;
         }
 
     }
 
-    return i;
+    return 1;
+}
+
+/**
+ * Loads a list of network interfaces and their up/down status in NET_IFS.
+ * @returns 1 if successful; 0 if not
+ */
+int loadNetIfs(void)
+{
+    struct ifaddrs *ifs;
+    struct ifaddrs *currIF;
+
+    // Make sure NET_IFS is empty if refreshing
+    if (NET_IFS_NO > 0)
+    {
+        memset(NET_IFS, 0, sizeof(NET_IFS));
+        NET_IFS_NO = 0;
+    }
+
+    if (getifaddrs(&ifs) == -1)
+        return 0;
+
+    for (currIF = ifs; currIF && NET_IFS_NO < MAX_NET_IFS_ENTRIES;
+        currIF = currIF->ifa_next)
+    {
+        if (!currIF->ifa_name)
+            continue;
+
+        // Skip loopback
+        if (strcmp(currIF->ifa_name, "lo") == 0)
+            continue;
+
+        // Duplicate check
+        int isDup = 0;
+        for (int i = 0; i < NET_IFS_NO; i++)
+        {
+            if (strncmp(NET_IFS[i].name, currIF->ifa_name,
+                NET_IF_NAME_LEN) == 0)
+            {
+                isDup = 1;
+                break;
+            }
+        }
+        if (isDup)
+            continue;
+
+        // Copy if name
+        strncpy(NET_IFS[NET_IFS_NO].name, currIF->ifa_name,
+            NET_IF_NAME_LEN - 1);
+        NET_IFS[NET_IFS_NO].name[NET_IF_NAME_LEN - 1] = '\0';
+
+        // Set up/down status
+        NET_IFS[NET_IFS_NO].up = (currIF->ifa_flags & IFF_UP) ? 1 : 0;
+
+        NET_IFS_NO++;
+    }
+    freeifaddrs(ifs);
+
+    return 1;
 }
 
 /**
@@ -554,8 +639,8 @@ void saveDispRes(MenuItem itm, int skipMsg)
 
     if (!skipMsg)
     {
-        char msgTitle[80];
-        snprintf(msgTitle, 80, "%s", itm.name);
+        char msgTitle[MENU_ITEM_NAME_LEN];
+        snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
         char msgBody[320] = "The selected display resolution has been saved. If you selected a VGA resolution and had selected a PSF font before, the latter setting will now be discarded as PSF fonts dictate their own VGA resolution. A system restart is required before the changes will take effect.";
 
         WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
@@ -579,8 +664,8 @@ void saveFontCol(MenuItem itm)
     snprintf(CONFIG.fontColANSI, sizeof(CONFIG.fontColANSI), "%s", itm.id);
     writeConf();
 
-    char msgTitle[80];
-    snprintf(msgTitle, 80, "%s", itm.payload);
+    char msgTitle[MENU_ITEM_NAME_LEN];
+    snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.payload);
     char msgBody[320] = "The selected font colour has been saved and will be applied once you exit SHORKSET. If there are any other active virtual terminals (ttyX), you may need to enter \"exit\" when convenient, or restart your computer before this change will take complete effect.";
 
     WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
@@ -600,7 +685,7 @@ void saveFontPSF(MenuItem itm)
         snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "default");
         writeConf();
         
-        char msgTitle[80] = "default";
+        char msgTitle[MENU_ITEM_NAME_LEN] = "default";
         char msgBody[320] = "The PSF font will be reset to default. If a PSF font other than \"default\" was previously selected, you must restart your computer before this change will take effect.";
 
         WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
@@ -626,8 +711,8 @@ void saveFontPSF(MenuItem itm)
         else
             writeConf();
 
-        char msgTitle[80];
-        snprintf(msgTitle, 80, "%s", itm.name);
+        char msgTitle[MENU_ITEM_NAME_LEN];
+        snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
         char msgBody[320] = "The selected PSF font has been saved and will be applied once you exit SHORKSET. If you had selected a VGA display resolution before, that setting will now be discarded as the PSF font will dictate its own VGA resolution. VBE display resolutions are unaffected.";
 
         WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
@@ -651,8 +736,8 @@ void saveKeymap(MenuItem itm)
     snprintf(CONFIG.keymap, sizeof(CONFIG.keymap), "%s", itm.id);
     writeConf();
 
-    char msgTitle[80];
-    snprintf(msgTitle, 80, "%s", itm.name);
+    char msgTitle[MENU_ITEM_NAME_LEN];
+    snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
     char msgBody[320] = "The selected keyboard layout has been applied.";
 
     WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
@@ -671,8 +756,8 @@ void saveVolume(MenuItem itm)
     applyVolume(CONFIG.volume);
     writeConf();
 
-    /*char msgTitle[80];
-    snprintf(msgTitle, 80, "%s", itm.name);
+    /*char msgTitle[MENU_ITEM_NAME_LEN];
+    snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
     char msgBody[320] = "The selected volume level has been applied.";
 
     WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
@@ -932,6 +1017,7 @@ void showDriverCatsMenu(void)
 
     clearScreen();
 }
+
 /**
  * Displays drivers list selection menu
  * @param cat Driver category to filter the given list to
@@ -969,17 +1055,16 @@ void showDriversListMenu(const char *cat)
     if (strcmp(cat, "net") == 0)
     {
         snprintf(title, 32, "Toggle network interface driver");
-        snprintf(msg, 200, "Any driver marked with in green with a leading "
-            "asterisk (\"*\") is currently loaded. You may load multiple "
-            "network interface drivers.");
+        snprintf(msg, 200, "Select one or more drivers to load or unload "
+            "their Linux modules. Any driver marked in green with a "
+            "leading \"*\" is currently loaded.");
     }
     else if (strcmp(cat, "snd") == 0)
     {
         snprintf(title, 32, "Toggle sound card driver");
-        snprintf(msg, 200, "A driver marked with in green with a leading "
-            "asterisk (\"*\") is currently loaded. You may only load one "
-            "sound card driver at a time. Loading a driver will unload any "
-            "existing ones.");
+        snprintf(msg, 200, "Select a driver to load or unload its Linux "
+            "module. The driver marked in green with a leading \"*\" is "
+            "currently loaded.");
     }
 
     while (running)
@@ -997,37 +1082,14 @@ void showDriversListMenu(const char *cat)
                     {
                         if (strcmp(menu[i].id, loaded.modules[j]) == 0)
                         {
-                            // Add leading "*" if missing
-                            if (menu[i].name[0] != '\x1b')
-                            {
-                                char buffer[sizeof(menu[i].name)];
-                                snprintf(buffer, sizeof(buffer), 
-                                    "\x1b[%sm*%s\x1b[0m", COL_FOR_GREEN, 
-                                    menu[i].name);
-                                strcpy(menu[i].name, buffer);
-                            }
+                            markEntry(menu[i].name, COL_FOR_GREEN, 0);
                             marked = 1;
                             break;
                         }
                     }
 
                     if (!marked)
-                    {
-                        // Remove leading "*" if present
-                        if (menu[i].name[0] == '\x1b')
-                        {
-                            char *ast = strchr(menu[i].name, '*');
-                            if (ast)
-                            {
-                                char *rst = strstr(ast, "\x1b[0m");
-                                size_t len = rst ?
-                                    (size_t)(rst - (ast + 1)) :
-                                    strlen(ast + 1);
-                                memmove(menu[i].name, ast + 1, len);
-                                menu[i].name[len] = '\0';
-                            }
-                        }
-                    }
+                        unmarkEntry(menu[i].name);
                 }
             }
 
@@ -1069,6 +1131,9 @@ void showDriversListMenu(const char *cat)
 
             case ENTER:
                 toggleDriver(menu[cursorY - 1].id);
+                // If toggling a networking driver, update NET_IFS
+                if (strcmp(cat, "net") == 0)
+                    loadNetIfs();
                 break;
         
             case QUIT:
@@ -1529,7 +1594,8 @@ void showMainMenu(void)
     // check the bootloader conf in case of a manual edit
     getCurrRes();
     getKernelVer();
-    MODULES_NO = loadModules();
+    loadModules();
+    loadNetIfs();
 
     MenuItem rawMenu[] = {
         { 
@@ -1566,6 +1632,13 @@ void showMainMenu(void)
             "",
             showFontColMenu,
             1
+        },
+        {
+            "net",
+            "Network",
+            "",
+            showNetManMenu,
+            isProgramInstalled("ifconfig", 1)
         },
         {
             "vol",
@@ -1655,6 +1728,253 @@ void showMainMenu(void)
 void showNetDriversMenu(void)
 {
     showDriversListMenu("net");
+}
+
+/**
+ * Shows the network (manager) menu.
+ */
+void showNetManMenu(void)
+{
+    MenuItem rawMenu[] = {
+        {
+            "enb", "Enable networking", NULL, NULL, 1
+        },
+        {
+            "aif", "Select interfaces", NULL, showNetSelectIfs,
+            NET_IFS_NO > 0
+        }
+    };
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int realMenuSize = 0;
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isVisible)
+            menu[realMenuSize++] = rawMenu[i];
+    freeMenu(rawMenu, rawMenuSize);
+
+    // The menu size used in the menu loop that can be =1 if networking is
+    // disabled
+    int currMenuSize = realMenuSize;
+    if (!CONFIG.netEnabled)
+        currMenuSize = 1;
+
+    // Set enable/disable networking item's default value
+    if (CONFIG.netEnabled)
+    {
+        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable networking");
+        markEntry(menu[0].name, COL_FOR_GREEN, 1);
+    }
+    else
+    {
+        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable networking");
+        markEntry(menu[0].name, COL_FOR_RED, 1);
+    }
+
+    char msg[200] = {0};
+    if (NET_IFS_NO == 0)
+    {
+        snprintf(msg, 200, "No network interfaces were found. Please "
+            "ensure your network controllers are properly installed and "
+            "that you have selected the correct drivers in the \"Drivers\" "
+            "menu.");
+    }
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            // Show/hide full menu depending on CONFIG.netEnabled
+            if (CONFIG.netEnabled)
+                currMenuSize = realMenuSize;
+            else
+                currMenuSize = 1;
+
+            clearScreen();
+            printHeader("Network");
+            printMenu(menu, currMenuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                currMenuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, currMenuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                currMenuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = currMenuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > currMenuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                if (cursorY == 1)
+                    toggleNetEnabled(menu[cursorY - 1].name);
+                else
+                    menu[cursorY - 1].action();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
+/**
+ * Shows the select network interfaces menu.
+ */
+void showNetSelectIfs(void)
+{
+    // Create a menu containing modules for the given cat
+    MenuItem menu[NET_IFS_NO];
+    int menuSize = 0;
+    for (int i = 0; i < NET_IFS_NO; i++)
+    {
+        snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s",
+            NET_IFS[i].name);
+
+        if (strncmp(NET_IFS[i].name, "eth", 3) == 0 ||
+            strncmp(NET_IFS[i].name, "enp", 3) == 0 ||
+            strncmp(NET_IFS[i].name, "ens", 3) == 0 ||
+            strncmp(NET_IFS[i].name, "eno", 3) == 0)
+            snprintf(menu[menuSize].name, sizeof(menu[menuSize].name),
+                "Ethernet (%s)", NET_IFS[i].name);
+        else if (strncmp(NET_IFS[i].name, "wlan", 4) == 0 ||
+            strncmp(NET_IFS[i].name, "wlx", 3) == 0)
+            snprintf(menu[menuSize].name, sizeof(menu[menuSize].name),
+                "Wireless (%s)", NET_IFS[i].name);
+        else
+            snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s",
+                NET_IFS[i].name);
+
+        menu[menuSize].payload = NULL;
+        menu[menuSize].action = NULL;
+        menu[menuSize].isVisible = 1;
+        menu[menuSize].isStatic = 0;
+        menuSize++;
+    }
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    char msg[200] = "Select one or more network interfaces to activate or "
+        "deactivate them. Any interface marked in green with a leading "
+        "\"*\" currently activated.";
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            // Mark/unmark the active interfaces
+            for (int i = 0; i < menuSize; i++)
+            {
+                if (NET_IFS[i].up)
+                    markEntry(menu[i].name, COL_FOR_GREEN, 0);
+                else
+                    unmarkEntry(menu[i].name);
+            }
+
+            clearScreen();
+            printHeader("Available interfaces");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                toggleNetIf(menu[cursorY - 1].id);
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
 }
 
 void showSndDriversMenu(void)
@@ -1819,8 +2139,8 @@ void toggleDriver(const char *id)
         {
             tcflush(STDIN_FILENO, TCIFLUSH);
 
-            char msgTitle[80];
-            snprintf(msgTitle, 80, "Could not load driver");
+            char msgTitle[MENU_ITEM_NAME_LEN];
+            snprintf(msgTitle, MENU_ITEM_NAME_LEN, "Could not load driver");
             char msgBody[480] = "The selected driver's Linux module could "
             "not be loaded. This likely means the hardware it targets is "
             "not present or addressable, and the module could not load "
@@ -1836,7 +2156,7 @@ void toggleDriver(const char *id)
 
             return;
         }
-        csvAppend(CONFIG.modules, sizeof(CONFIG.modules), id);
+        csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, id);
     }
     else
     {
@@ -1862,7 +2182,172 @@ void toggleDriver(const char *id)
 }
 
 /**
- * Writes CONFIG's current values to the shorkset.conf.
+ * Toggles the value of CONFIG.netEnabled and writes it, then modifies the
+ * toggling menu item to convey the new status.
+ * @param name Name of the menu item that toggled this
+ */
+void toggleNetEnabled(char *name)
+{
+    CONFIG.netEnabled = !CONFIG.netEnabled;
+    writeConf();
+    // TODO: confirmation screen?
+
+    if (CONFIG.netEnabled)
+    {
+        snprintf(name, MENU_ITEM_NAME_LEN, "Disable networking");
+        markEntry(name, COL_FOR_GREEN, 1);
+    }
+    else
+    {
+        snprintf(name, MENU_ITEM_NAME_LEN, "Enable networking");
+        markEntry(name, COL_FOR_RED, 1);
+    }
+}
+
+/**
+ * Toggles the up (activated)/down (deactivated) status of the given network
+ * interface to its opposite value.
+ * @param id Network interface's menu item ID
+ */
+void toggleNetIf(const char *id)
+{
+    // Get pointer to the interface to operate on
+    NetIfEntry *netIf = NULL;
+    for(int i = 0; i < NET_IFS_NO; i++)
+    {
+        if(strcmp(NET_IFS[i].name, id) == 0)
+        {
+            netIf = &NET_IFS[i];
+            break;
+        }
+    }
+    if (!netIf)
+    {
+        EXIT_MSG = strdup("ERROR: could not find network interface");
+        exit(1);
+    }
+
+    // Show notice dialog
+    char dlgMsg[256];
+    if (!netIf->up)
+        snprintf(dlgMsg, 256, "Activating %s. Please wait.", id);
+    else
+        snprintf(dlgMsg, 256, "Deactivating %s. Please wait.", id);
+    showDialog(dlgMsg, 50);
+    sleep(1);
+
+    // Get socket for operations
+    int fdSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fdSocket < 0)
+    {
+        EXIT_MSG = strdup("ERROR: could not create socket for network "
+            "interface operations");
+        exit(1);
+    }
+
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, netIf->name, IFNAMSIZ);
+
+    // Read current flags
+    if (ioctl(fdSocket, SIOCGIFFLAGS, &ifr) < 0)
+    {
+        close(fdSocket);
+        EXIT_MSG = strdup("ERROR: could not read network interface flags "
+            "from the system");
+        exit(1);
+    }
+
+    // If netIf is currently down, set it up
+    if (!netIf->up)
+        ifr.ifr_flags |= IFF_UP;
+    // ...and vice versa
+    else
+        ifr.ifr_flags &= ~IFF_UP;
+    netIf->up = !netIf->up;
+
+    // Write flags back
+    if (ioctl(fdSocket, SIOCSIFFLAGS, &ifr) < 0)
+    {
+        close(fdSocket);
+        EXIT_MSG = strdup("ERROR: could not write network interface flags "
+            "back to the system");
+        exit(1);
+    }
+    close(fdSocket);
+
+    // If the interface is now "up", run DHCP so the connection can be
+    // immediately available
+    if (netIf->up)
+    {
+        char carrierPath[PATH_MAX];
+        snprintf(carrierPath, PATH_MAX, "/sys/class/net/%s/carrier",
+            netIf->name);
+
+        int carrierReady = 0;
+        // Make sure carrier is ready (and wait for up to 10 secs if not)
+        for (int i = 0; i < 100; i++)
+        {
+            FILE *carrierFile = fopen(carrierPath, "r");
+            if (carrierFile)
+            {
+                char carrierStatus = fgetc(carrierFile);
+                fclose(carrierFile);
+                if (carrierStatus == '1')
+                {
+                    carrierReady = 1;
+                    break;
+                }
+            }
+            usleep(100000);
+        }
+        if (!carrierReady)
+        {
+            EXIT_MSG = strdup("ERROR: network interface carrier was not "
+                "ready before timeout");
+            exit(1);
+        }
+
+        pid_t pid = fork();
+        if (pid < 0)
+        {
+            EXIT_MSG = strdup("ERROR: could not fork udhcpc process");
+            exit(1);
+        }
+
+        if (pid == 0)
+        {
+            int ifNull = open("/dev/null", O_RDWR);
+            if (ifNull < 0)
+            {
+                EXIT_MSG = strdup("ERROR: could not redirect udhcpc output "
+                    "to /dev/null");
+                exit(1);
+            }
+
+            dup2(ifNull, STDOUT_FILENO);
+            dup2(ifNull, STDERR_FILENO);
+            close(ifNull);
+
+            execlp("udhcpc", "udhcpc", "-i", netIf->name, "-n", "-t", "3",
+                "-T", "2", "-s", UDHCPC_DEFAULT_SCRIPT, (char *)NULL);
+
+            _exit(1);
+            EXIT_MSG = strdup("ERROR: could not run udhcpc");
+            exit(1);
+        }
+    }
+
+    // Now that we know the system changes worked, we can write the changes
+    if (netIf->up)
+        csvAppend(CONFIG.netIfs, CONFIG_NET_IFS_LEN, id);
+    else
+        csvRemove(CONFIG.netIfs, id);
+    writeConf();
+}
+
+/**
+ * Writes CONFIG's current values into shorkset.conf.
  */
 void writeConf(void)
 {
@@ -1881,6 +2366,8 @@ void writeConf(void)
     fprintf(stream, "FONT_PSF=\"%s\"\n", CONFIG.fontPSF);
     fprintf(stream, "KEYMAP=\"%s\"\n", CONFIG.keymap);
     fprintf(stream, "MODULES=\"%s\"\n", CONFIG.modules);
+    fprintf(stream, "NET_ENABLED=%d\n", CONFIG.netEnabled);
+    fprintf(stream, "NET_IFS=\"%s\"\n", CONFIG.netIfs);
     fprintf(stream, "VOLUME=%d\n", CONFIG.volume);
     fclose(stream);
     sync();
