@@ -54,6 +54,7 @@ char KERNEL_VER[KERNEL_VER_LEN] = {0};
 char KEYMAPS[MAX_KEYMAPS][PATH_MAX] = {0};
 int KEYMAPS_COUNT = 0;
 int IS_NET_MODULES = 0;
+int IS_PBR_MODULES = 0;
 int IS_SND_MODULES = 0;
 ModuleEntry MODULES[MAX_MODULES_ENTRIES] = {0};
 int MODULES_NO = 0;
@@ -479,6 +480,8 @@ int loadModules(void)
             // Flag which driver categories were sound
             if (!IS_NET_MODULES && strcmp(fields[2], "net") == 0)
                 IS_NET_MODULES = 1;
+            else if (!IS_PBR_MODULES && strcmp(fields[2], "pbr") == 0)
+                IS_PBR_MODULES = 1;
             else if (!IS_SND_MODULES && strcmp(fields[2], "snd") == 0)
                 IS_SND_MODULES = 1;
             MODULES_NO++;
@@ -935,6 +938,10 @@ void showDriverCatsMenu(void)
             IS_NET_MODULES, 0
         },
         {
+            "pbr", "PCMCIA bridge", NULL, showPBrDriversMenu,
+            IS_PBR_MODULES, 0
+        },
+        {
             "snd", "Sound card", NULL, showSndDriversMenu,
             IS_SND_MODULES, 0
         }
@@ -1059,6 +1066,13 @@ void showDriversListMenu(const char *cat)
             "their Linux modules. Any driver marked in green with a "
             "leading \"*\" is currently loaded.");
     }
+    else if (strcmp(cat, "pbr") == 0)
+    {
+        snprintf(title, 32, "Toggle PCMCIA bridge driver");
+        snprintf(msg, 200, "Select a driver to load or unload its Linux "
+            "module. The driver marked in green with a leading \"*\" is "
+            "currently loaded.");
+    }
     else if (strcmp(cat, "snd") == 0)
     {
         snprintf(title, 32, "Toggle sound card driver");
@@ -1073,24 +1087,21 @@ void showDriversListMenu(const char *cat)
         {
             // Mark/unmark the loaded modules
             LoadedModules loaded = getLoadedModules();
-            if (loaded.count > 0)
+            for (int i = 0; i < menuSize; i++)
             {
-                for (int i = 0; i < menuSize; i++)
+                int marked = 0;
+                for (int j = 0; j < loaded.count; j++)
                 {
-                    int marked = 0;
-                    for (int j = 0; j < loaded.count; j++)
+                    if (strcmp(menu[i].id, loaded.modules[j]) == 0)
                     {
-                        if (strcmp(menu[i].id, loaded.modules[j]) == 0)
-                        {
-                            markEntry(menu[i].name, COL_FOR_GREEN, 0);
-                            marked = 1;
-                            break;
-                        }
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
+                        marked = 1;
+                        break;
                     }
-
-                    if (!marked)
-                        unmarkEntry(menu[i].name);
                 }
+
+                if (!marked)
+                    unmarkEntry(menu[i].name);
             }
 
             clearScreen();
@@ -1977,6 +1988,11 @@ void showNetSelectIfs(void)
     clearScreen();
 }
 
+void showPBrDriversMenu(void)
+{
+    showDriversListMenu("pbr");
+}
+
 void showSndDriversMenu(void)
 {
     showDriversListMenu("snd");
@@ -2142,11 +2158,11 @@ void toggleDriver(const char *id)
             char msgTitle[MENU_ITEM_NAME_LEN];
             snprintf(msgTitle, MENU_ITEM_NAME_LEN, "Could not load driver");
             char msgBody[480] = "The selected driver's Linux module could "
-            "not be loaded. This likely means the hardware it targets is "
-            "not present or addressable, and the module could not load "
-            "without it. Please ensure the target hardware is properly "
-            "connected when it is safe to do so, or that you are trying "
-            "the correct driver.";
+                "not be loaded. This likely means the hardware it targets "
+                "is not present or addressable, and the module could not "
+                "load without it. Please ensure the target hardware is "
+                "properly connected when it is safe to do so, or that you "
+                "are trying the correct driver.";
 
             WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
                 NULL, 0, 0);
@@ -2166,15 +2182,31 @@ void toggleDriver(const char *id)
         showDialog(dlgMsg, 50);
         sleep(1);
 
+        // Always remove module from CONFIG.modules so if it fails to unload
+        // now, we know it won't be loaded next boot
+        csvRemove(CONFIG.modules, id);
+
         // Unload driver's module via rmmod
         int result = runCmd("rmmod", id, NULL);
         if (result != 0)
         {
-            EXIT_MSG = strdup("rmmod: could not run rmmod to unload "
-                "driver module");
-            exit(1);
+            tcflush(STDIN_FILENO, TCIFLUSH);
+    
+            char msgTitle[MENU_ITEM_NAME_LEN];
+            snprintf(msgTitle, MENU_ITEM_NAME_LEN,
+                "Could not unload driver");
+            char msgBody[480] = "The selected driver's Linux module could "
+                "not be unloaded immediately. This could be due to the "
+                "driver being in use. It has been removed from SHORKSET's "
+                "saved configuration so that it will not be loaded upon "
+                "reboot.";
+
+            WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+                NULL, 0, 0);
+            printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+            free(wrapped->str);
+            free(wrapped);
         }
-        csvRemove(CONFIG.modules, id);
     }
 
     writeConf();

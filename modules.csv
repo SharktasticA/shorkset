@@ -51,6 +51,11 @@ wd,kernel/drivers/net/ethernet/8390/wd.ko.gz,net,ISA,Western Digital WD80x3
 winbond_840,kernel/drivers/net/ethernet/dec/tulip/winbond-840.ko.gz,net,PCI,Winbond W89c840
 xirc2ps_cs,kernel/drivers/net/ethernet/xircom/xirc2ps_cs.ko.gz,net,PCMCIA,Xircom 16-bit
 xircom_cb,kernel/drivers/net/ethernet/dec/tulip/xircom_cb.ko.gz,net,PCMCIA,Xircom Tulip
+pd6729,kernel/drivers/pcmcia/pd6729.ko.gz,pbr,PCMCIA 16-bit,Cirrus Logic CL-PD6729 PCI-PCMCIA bridge
+tcic,kernel/drivers/pcmcia/tcic.ko.gz,pbr,PCMCIA 16-bit,Databook TCIC-2 ISA-PCMCIA bridge
+i82092,kernel/drivers/pcmcia/i82092.ko.gz,pbr,PCMCIA 16-bit,Intel 82092-compatible PCI-PCMCIA bridge
+i82365,kernel/drivers/pcmcia/i82365.ko.gz,pbr,PCMCIA 16-bit,Intel 82365-compatible ISA-PCMCIA bridge
+yenta_socket,kernel/drivers/pcmcia/yenta_socket.ko.gz,pbr,PCMCIA 32-bit,Yenta-compatible PCI-PCMCIA bridge
 snd_adlib,kernel/sound/isa/snd-adlib.ko.gz,snd,ISA,AdLib Music Synthesizer
 snd_ad1848,kernel/sound/isa/ad1848/snd-ad1848.ko.gz,snd,ISA,Analog Devices AD1848 & Cirrus Logic CS4248
 snd_atiixp,kernel/sound/pci/snd-atiixp.ko.gz,snd,PCI,ATI IXP AC97
