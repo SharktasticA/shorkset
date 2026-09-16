@@ -52,7 +52,7 @@ typedef struct {
     char fontColANSI[CONFIG_FONT_COL_ANSI_LEN];
     // Font PSF path (default: "default")
     char fontPSF[PATH_MAX];
-    // Keyboard layout (keymap) path (default: "en_us")
+    // Keyboard layout (keymap) path (default: "qwerty_en_us")
     char keymap[PATH_MAX];
     // Linux modules to load at system startup
     char modules[CONFIG_MODULES_LEN];

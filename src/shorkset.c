@@ -41,7 +41,7 @@ Config CONFIG = {
     "white",
     "0;37",
     "default",
-    "en_us",
+    "qwerty_en_us",
     "",
     0,
     "",
