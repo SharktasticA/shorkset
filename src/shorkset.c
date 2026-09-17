@@ -1141,7 +1141,7 @@ void showDriversListMenu(const char *cat)
                 break;
 
             case ENTER:
-                toggleDriver(menu[cursorY - 1].id);
+                toggleDriver(menu[cursorY - 1].id, cat);
                 // If toggling a networking driver, update NET_IFS
                 if (strcmp(cat, "net") == 0)
                     loadNetIfs();
@@ -2171,9 +2171,10 @@ void showVolumeMenu(void)
 /**
  * Loads/unloads the given driver's Linux module id depending on if its
  * unloaded/loaded.
- * @param id ID for Linux module to toggle
+ * @param id Module's ID
+ * @param cat Module's category
  */
-void toggleDriver(const char *id)
+void toggleDriver(const char *id, const char *cat)
 {
     // Check if module is loaded
     LoadedModules modules = getLoadedModules();
@@ -2220,7 +2221,8 @@ void toggleDriver(const char *id)
 
             return;
         }
-        csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, id);
+        csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, id,
+            strcmp(cat, "pbr") == 0);
     }
     else
     {
@@ -2420,7 +2422,7 @@ void toggleNetIf(const char *id)
 
     // Now that we know the system changes worked, we can write the changes
     if (netIf->up)
-        csvAppend(CONFIG.netIfs, CONFIG_NET_IFS_LEN, id);
+        csvAppend(CONFIG.netIfs, CONFIG_NET_IFS_LEN, id, 0);
     else
         csvRemove(CONFIG.netIfs, id);
     writeConf();

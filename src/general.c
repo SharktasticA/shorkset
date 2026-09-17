@@ -5,7 +5,7 @@
     ## General, utility functions for SHORK Utilities & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision C                                       ##
+    ## Revision D                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -309,9 +309,11 @@ int countSubstrs(const char *str, const char *sub)
  * @param buffer Buffer containing the CSV string to operate on
  * @param bufferSize Buffer size
  * @param item Item to add
+ * @param toStart Flags if the item should be added to the beginning
  * @return 1 if successfully added; 0 if present or no space
  */
-int csvAppend(char *buffer, int bufferSize, const char *item)
+int csvAppend(char *buffer, const int bufferSize, const char *item,
+    const int toStart)
 {
     int itemLen = strlen(item);
     int currLen = strlen(buffer);
@@ -332,9 +334,21 @@ int csvAppend(char *buffer, int bufferSize, const char *item)
         // No space
         return 0;
 
-    if (sepLen)
-        strcat(buffer, ",");
-    strcat(buffer, item);
+    if (toStart)
+    {
+        // Shift existing content right
+        memmove(buffer + itemLen + sepLen, buffer, currLen + 1);
+        // Copy item into free space after shifting
+        memcpy(buffer, item, itemLen);
+        if (sepLen)
+            buffer[itemLen] = ',';
+    }
+    else
+    {
+        if (sepLen)
+            strcat(buffer, ",");
+        strcat(buffer, item);
+    }
 
     return 1;
 }

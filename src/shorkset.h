@@ -135,7 +135,7 @@ void showNetSelectIfs(void);
 void showPBrDriversMenu(void);
 void showSndDriversMenu(void);
 void showVolumeMenu(void);
-void toggleDriver(const char*);
+void toggleDriver(const char*, const char*);
 void toggleNetEnabled(char*);
 void toggleNetIf(const char*);
 void writeConf(void);

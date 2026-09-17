@@ -53,7 +53,7 @@ char *bytesToReadable(const char *, const long long);
 char *captureProgramOutput(const char *, const int);
 char *colourWrap(const char*, const char*, const char*);
 int countSubstrs(const char *, const char *);
-int csvAppend(char*, int, const char*);
+int csvAppend(char*, const int, const char*, const int);
 int csvRemove(char*, const char*);
 char *extractFromPoint(char *, int, char);
 int fileExists(const char*);
