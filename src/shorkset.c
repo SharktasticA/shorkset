@@ -1326,20 +1326,29 @@ void showFontPSFMenu(void)
         menuSize++;
     }
 
+    // Prepare for multi-column menu
+    int colWidth = 22;
+    int cols = TERM_SIZE.ws_col / (colWidth + 3);
+    if (cols < 1) cols = 1;
+    if (cols > menuSize) cols = menuSize;
+    int rows = (menuSize + cols - 1) / cols;
+
     int running = 1;
     int cursorX = 1;
     int cursorY = 1;
-    int cursorXPrev = 1;
+    int cursorXPrev = 0;
     int cursorYPrev = 0;
+    int maxY = 0;
     int fullRedraw = 1;
 
-    // Mark the current colour
+    // Mark the current font
     for (int i = 0; i < menuSize; i++)
     {
         if (strcmp(menu[i].payload, CONFIG.fontPSF) == 0)
         {
             strcat(menu[i].name, "*");
-            cursorY = i + 1;
+            cursorX = i / rows + 1;
+            cursorY = i % rows + 1;
             break;
         }
     }
@@ -1350,7 +1359,7 @@ void showFontPSFMenu(void)
         {
             clearScreen();
             printHeader("Select font (PSF)");
-            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
         else
@@ -1359,32 +1368,74 @@ void showFontPSFMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
 
         fullRedraw = 1;
-        cursorYPrev = 0;
+        cursorXPrev = cursorYPrev = 0;
         switch (input)
         {
+            case CURSOR_LEFT:
+                cursorXPrev = cursorX;
+                cursorYPrev = cursorY;
+                cursorX--;
+
+                if (cursorX < 1) cursorX = cols;
+                while ((maxY = rowsInCol(menuSize, rows, cursorX)) == 0)
+                {
+                    cursorX--;
+                    if (cursorX < 1) cursorX = cols;
+                }
+                if (cursorY > maxY) cursorY = maxY;
+                if (cursorY < 1) cursorY = maxY;
+
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_RIGHT:
+                cursorXPrev = cursorX;
+                cursorYPrev = cursorY;
+                cursorX++;
+
+                if (cursorX > cols) cursorX = 1;
+                while ((maxY = rowsInCol(menuSize, rows, cursorX)) == 0)
+                {
+                    cursorX++;
+                    if (cursorX > cols) cursorX = 1;
+                }
+                if (cursorY > maxY) cursorY = maxY;
+                if (cursorY < 1) cursorY = maxY;
+
+                fullRedraw = 0;
+                break;
+
             case CURSOR_UP:
+                cursorXPrev = cursorX;
                 cursorYPrev = cursorY;
                 cursorY--;
-                if (cursorY < 1) cursorY = menuSize;
+
+                if (cursorY < 1)
+                    cursorY = rowsInCol(menuSize, rows, cursorX);
+
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
+                cursorXPrev = cursorX;
                 cursorYPrev = cursorY;
                 cursorY++;
-                if (cursorY > menuSize) cursorY = 1;
+
+                if (cursorY > rowsInCol(menuSize, rows, cursorX))
+                    cursorY = 1;
+                    
                 fullRedraw = 0;
                 break;
 
             case ENTER:
                 clearScreen();
-                saveFontPSF(menu[cursorY - 1]);
+                saveFontPSF(menu[(cursorY - 1) + (cursorX - 1) * rows]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
@@ -1395,7 +1446,8 @@ void showFontPSFMenu(void)
                         if (len == 0 || menu[i].name[len - 1] != '*')
                         {
                             strcat(menu[i].name, "*");
-                            cursorY = i + 1;
+                            cursorX = i / rows + 1;
+                            cursorY = i % rows + 1;
                         }
                     }
                     else
@@ -1414,10 +1466,6 @@ void showFontPSFMenu(void)
 
             case INVALID:
                 fullRedraw = 0;
-                break;
-
-            case CURSOR_LEFT:
-            case CURSOR_RIGHT:
                 break;
         }
     }
