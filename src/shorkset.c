@@ -200,6 +200,25 @@ void getCurrRes(void)
 }
 
 /**
+ * Converts a human-readible volume percent (0-100%) to a value the OSS API
+ * expects. 
+ * @param pct Human-readible volume percentage (0-100)
+ * @return Logarithmic volume level for OSS API
+ */
+int getHWVolume(int pct)
+{
+    if (pct <= 0)
+        return 0;
+    if (pct > 100)
+        return 100;
+
+    double hw = 100.0 + 12.5 * log2(pct / 100.0);
+    if (hw < 50)
+        hw = 50;
+    return (int)(hw + 0.5);
+}
+
+/**
  * Loads the Linux kernel version into KERNEL_VER.
  */
 void getKernelVer(void)
@@ -254,22 +273,16 @@ LoadedModules getLoadedModules(void)
 }
 
 /**
- * Converts a human-readible volume percent (0-100%) to a value the OSS API
- * expects. 
- * @param pct Human-readible volume percentage (0-100)
- * @return Logarithmic volume level for OSS API
+ * Get the ModuleEntry that corresponds to the given module name.
+ * @param name Module name to find
+ * @return Pointer to the correct ModuleEntry; NULL if not found
  */
-int getHWVolume(int pct)
+ModuleEntry *getModuleFromName(const char *name)
 {
-    if (pct <= 0)
-        return 0;
-    if (pct > 100)
-        return 100;
-
-    double hw = 100.0 + 12.5 * log2(pct / 100.0);
-    if (hw < 50)
-        hw = 50;
-    return (int)(hw + 0.5);
+    for (int i = 0; i < MODULES_NO; i++)
+        if (strcmp(name, MODULES[i].name) == 0)
+            return &MODULES[i];
+    return NULL;
 }
 
 /**
@@ -1141,7 +1154,7 @@ void showDriversListMenu(const char *cat)
                 break;
 
             case ENTER:
-                toggleDriver(menu[cursorY - 1].id, cat);
+                toggleDriver(getModuleFromName(menu[cursorY - 1].id));
                 // If toggling a networking driver, update NET_IFS
                 if (strcmp(cat, "net") == 0)
                     loadNetIfs();
@@ -2171,17 +2184,16 @@ void showVolumeMenu(void)
 /**
  * Loads/unloads the given driver's Linux module id depending on if its
  * unloaded/loaded.
- * @param id Module's ID
- * @param cat Module's category
+ * @param mod Module to toggle
  */
-void toggleDriver(const char *id, const char *cat)
+void toggleDriver(const ModuleEntry *mod)
 {
     // Check if module is loaded
     LoadedModules modules = getLoadedModules();
     int loaded = 0;
     for (int i = 0; i < modules.count; i++)
     {
-        if (strcmp(id, modules.modules[i]) == 0)
+        if (strcmp(mod->name, modules.modules[i]) == 0)
         {
             loaded = 1;
             break;
@@ -2194,12 +2206,12 @@ void toggleDriver(const char *id, const char *cat)
     {
         char dlgMsg[256];
         snprintf(dlgMsg, 256, "The Linux module for the %s driver is being "
-            "loaded. Please wait.", id);
+            "loaded. Please wait.", mod->description);
         showDialog(dlgMsg, 50);
         sleep(1);
 
         // Load driver's module via modprobe
-        int result = runCmd("modprobe", id, NULL);
+        int result = runCmd("modprobe", mod->name, NULL);
         if (result != 0)
         {
             tcflush(STDIN_FILENO, TCIFLUSH);
@@ -2221,23 +2233,44 @@ void toggleDriver(const char *id, const char *cat)
 
             return;
         }
-        csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, id,
-            strcmp(cat, "pbr") == 0);
+        csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, mod->name,
+            strcmp(mod->name, "pbr") == 0);
+
+        // Show notice about needing a PCMCIA bridge driver if we just
+        // loaded a PCMCIA net IF driver
+        if (strcmp(mod->category, "net") == 0 &&
+            strcmp(mod->bus, "PCMCIA") == 0)
+        {
+            char msgTitle[MENU_ITEM_NAME_LEN];
+            snprintf(msgTitle, MENU_ITEM_NAME_LEN,
+                "PCMCIA network interface driver loaded");
+            char msgBody[300] = "This PCMCIA network interface driver is "
+                "now loaded. In case you have not already done so, please "
+                "note that you may also need to load a PCMCIA bridge "
+                "driver and restart your computer before it will work "
+                "correctly.";
+
+            WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+                NULL, 0, 0);
+            printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+            free(wrapped->str);
+            free(wrapped);
+        }
     }
     else
     {
         char dlgMsg[256];
         snprintf(dlgMsg, 256, "The Linux module for the %s driver is being "
-            "unloaded. Please wait.", id);
+            "unloaded. Please wait.", mod->description);
         showDialog(dlgMsg, 50);
         sleep(1);
 
         // Always remove module from CONFIG.modules so if it fails to unload
         // now, we know it won't be loaded next boot
-        csvRemove(CONFIG.modules, id);
+        csvRemove(CONFIG.modules, mod->name);
 
         // Unload driver's module via rmmod
-        int result = runCmd("rmmod", id, NULL);
+        int result = runCmd("rmmod", mod->name, NULL);
         if (result != 0)
         {
             tcflush(STDIN_FILENO, TCIFLUSH);
