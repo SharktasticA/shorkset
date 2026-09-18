@@ -783,6 +783,71 @@ void saveVolume(MenuItem itm)
 }
 
 /**
+ * Seeds I/O and physical memory resource ranges for any 16-bit PCMCIA
+ * sockets found. This is to be run after loading a PCMCIA bridge driver
+ * module so that any PCMCIA devices can immediately be used. This is
+ * basically a C implementation of the pcmcia_sock_seed() function in
+ * SHORK 486's typical /etc/init.d/rc script.
+ */
+void seedPCMCIASockets(void)
+{
+    const char *pcmciaSocket = "/sys/class/pcmcia_socket";
+    struct stat st;
+
+    // Wait until PCMCIA socket(s) appears in sysfs
+    for (int i = 0; stat(pcmciaSocket, &st) != 0 && i < 5; i++)
+        sleep(1);
+    // If nothing after 5 seconds, quit...
+    if (stat(pcmciaSocket, &st) != 0 || !S_ISDIR(st.st_mode))
+        return;
+
+    DIR *dir = opendir(pcmciaSocket);
+    if (!dir)
+        return;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (strncmp(entry->d_name, "pcmcia_socket", 13) != 0)
+            continue;
+
+        char ioPath[PATH_MAX], memPath[PATH_MAX], donePath[PATH_MAX];
+        snprintf(ioPath, PATH_MAX, "%s/%s/available_resources_io",
+            pcmciaSocket, entry->d_name);
+        snprintf(memPath, PATH_MAX, "%s/%s/available_resources_mem",
+            pcmciaSocket, entry->d_name);
+        snprintf(donePath, PATH_MAX, "%s/%s/available_resources_setup_done",
+            pcmciaSocket, entry->d_name);
+
+        // 32-bit PCMCIA probably don't expose the following nor need
+        // seeding
+        if (access(ioPath, F_OK) != 0)
+            continue;
+
+        FILE *stream;
+        // Host I/O port range this socket can hand out
+        if ((stream = fopen(ioPath, "w")))
+        {
+            fputs("0x0100 - 0x04ff", stream);
+            fclose(stream);
+        }
+        // Host memory this socket can hand out
+        if ((stream = fopen(memPath, "w")))
+        {
+            fputs("0x000d0000 - 0x000dffff", stream);
+            fclose(stream);
+        }
+        // Confirm setup is complete
+        if ((stream = fopen(donePath, "w")))
+        {
+            fputs("1", stream);
+            fclose(stream);
+        }
+    }
+    closedir(dir);
+}
+
+/**
  * Displays display resolution selection menu
  */
 void showDispResMenu(void)
@@ -2235,6 +2300,10 @@ void toggleDriver(const ModuleEntry *mod)
         }
         csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, mod->name,
             strcmp(mod->category, "pbr") == 0);
+        
+        // If a PCMCIA bridge driver was just loaded, seed potential sockets
+        if (strcmp(mod->category, "pbr") == 0)
+            seedPCMCIASockets();
 
         // Show notice about needing a PCMCIA bridge driver if we just
         // loaded a PCMCIA net IF driver

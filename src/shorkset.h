@@ -122,6 +122,7 @@ void saveFontCol(MenuItem);
 void saveFontPSF(MenuItem);
 void saveKeymap(MenuItem);
 void saveVolume(MenuItem);
+void seedPCMCIASockets(void);
 void showDispResMenu(void);
 void showDriverCatsMenu(void);
 void showDriversListMenu(const char*);
