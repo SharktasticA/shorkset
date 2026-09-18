@@ -2234,7 +2234,7 @@ void toggleDriver(const ModuleEntry *mod)
             return;
         }
         csvAppend(CONFIG.modules, CONFIG_MODULES_LEN, mod->name,
-            strcmp(mod->name, "pbr") == 0);
+            strcmp(mod->category, "pbr") == 0);
 
         // Show notice about needing a PCMCIA bridge driver if we just
         // loaded a PCMCIA net IF driver
