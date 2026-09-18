@@ -83,6 +83,7 @@ typedef struct {
 
 
 
+extern int ANY_PBR_LOADED;
 static const char *CFG_PATHS[] = {
     "/boot/grub/grub.cfg",
     "/boot/syslinux/syslinux.cfg"
@@ -101,6 +102,15 @@ extern ModuleEntry MODULES[MAX_MODULES_ENTRIES];
 extern int MODULES_NO;
 extern NetIfEntry NET_IFS[MAX_NET_IFS_ENTRIES];
 extern int NET_IFS_NO;
+static const char *PCMCIA_BRIDGES[] = {
+    "i82092",
+    "i82365",
+    "pd6729",
+    "tcic",
+    "yenta_socket"
+};
+static const int PCMCIA_BRIDGES_LEN = sizeof(PCMCIA_BRIDGES) /
+    sizeof(PCMCIA_BRIDGES[0]);
 
 
 

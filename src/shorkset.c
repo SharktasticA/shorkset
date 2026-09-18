@@ -48,6 +48,7 @@ Config CONFIG = {
     40
 };
 
+int ANY_PBR_LOADED = 0;
 char CONFONTS[MAX_FONTS][PATH_MAX] = {0};
 int CONFONTS_COUNT = 0;
 char KERNEL_VER[KERNEL_VER_LEN] = {0};
@@ -340,6 +341,19 @@ void loadConf(void)
             CONFIG.netEnabled = 0;
         if (CONFIG.volume < 0 || CONFIG.volume > 100)
             CONFIG.volume = 40;
+
+        // Check for any PCMCIA bridge driver so ANY_PBR_LOADED can be
+        // updated if needed
+        char modulesCopy[CONFIG_MODULES_LEN];
+        snprintf(modulesCopy, CONFIG_MODULES_LEN, "%s", CONFIG.modules);
+        char *tok = strtok(modulesCopy, ",");
+        while (tok)
+        {
+            for (int i = 0; i < PCMCIA_BRIDGES_LEN; i++)
+                if (strcmp(tok, PCMCIA_BRIDGES[i]) == 0)
+                    ANY_PBR_LOADED = 1;
+            tok = strtok(NULL, ",");
+        }
     }
     else
     {
@@ -1136,13 +1150,14 @@ void showDriversListMenu(const char *cat)
     int fullRedraw = 1;
 
     char title[32] = {0};
-    char msg[200] = {0};
+    char msg[300] = {0};
     if (strcmp(cat, "net") == 0)
     {
         snprintf(title, 32, "Toggle network interface driver");
-        snprintf(msg, 200, "Select one or more drivers to load or unload "
+        snprintf(msg, 300, "Select one or more drivers to load or unload "
             "their Linux modules. Any driver marked in green with a "
-            "leading \"*\" is currently loaded.");
+            "leading \"*\" is currently loaded. PCMCIA devices require a "
+            "PCMCIA bridge driver to be loaded first.");
     }
     else if (strcmp(cat, "pbr") == 0)
     {
@@ -2269,6 +2284,29 @@ void toggleDriver(const ModuleEntry *mod)
 
     if (!loaded)
     {
+        // Refuse to load module if its for a PCMCIA device when no PCMCIA
+        // bridge module is also loaded
+        if (strcmp(mod->bus, "PCMCIA") == 0 && !ANY_PBR_LOADED)
+        {
+            tcflush(STDIN_FILENO, TCIFLUSH);
+
+            char msgTitle[MENU_ITEM_NAME_LEN];
+            snprintf(msgTitle, MENU_ITEM_NAME_LEN,
+                "PCMCIA bridge driver required");
+            char msgBody[350] = "A PCMCIA bridge driver is needed before a "
+                "PCMCIA device driver can be loaded. Without it, there is "
+                "no way to detect or communicate with an inserted PCMCIA "
+                "card. Please return to the driver category menu and "
+                "select a PCMCIA bridge, before returning here.";
+
+            WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+                NULL, 0, 0);
+            printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+            free(wrapped->str);
+            free(wrapped);
+            return;
+        }
+    
         char dlgMsg[256];
         snprintf(dlgMsg, 256, "The Linux module for the %s driver is being "
             "loaded. Please wait.", mod->description);
@@ -2303,27 +2341,9 @@ void toggleDriver(const ModuleEntry *mod)
         
         // If a PCMCIA bridge driver was just loaded, seed potential sockets
         if (strcmp(mod->category, "pbr") == 0)
-            seedPCMCIASockets();
-
-        // Show notice about needing a PCMCIA bridge driver if we just
-        // loaded a PCMCIA net IF driver
-        if (strcmp(mod->category, "net") == 0 &&
-            strcmp(mod->bus, "PCMCIA") == 0)
         {
-            char msgTitle[MENU_ITEM_NAME_LEN];
-            snprintf(msgTitle, MENU_ITEM_NAME_LEN,
-                "PCMCIA network interface driver loaded");
-            char msgBody[300] = "This PCMCIA network interface driver is "
-                "now loaded. In case you have not already done so, please "
-                "note that you may also need to load a PCMCIA bridge "
-                "driver and restart your computer before it will work "
-                "correctly.";
-
-            WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
-                NULL, 0, 0);
-            printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
-            free(wrapped->str);
-            free(wrapped);
+            seedPCMCIASockets();
+            ANY_PBR_LOADED = 1;
         }
     }
     else
