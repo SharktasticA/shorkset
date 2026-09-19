@@ -568,7 +568,23 @@ int loadNetIfs(void)
         NET_IFS[NET_IFS_NO].name[NET_IF_NAME_LEN - 1] = '\0';
 
         // Set up/down status
-        NET_IFS[NET_IFS_NO].up = (currIF->ifa_flags & IFF_UP) ? 1 : 0;
+        int adminUp = (currIF->ifa_flags & IFF_UP) ? 1 : 0;
+        int carrierUp = 0;
+        if (adminUp)
+        {
+            char carrierPath[PATH_MAX];
+            snprintf(carrierPath, PATH_MAX, "/sys/class/net/%s/carrier",
+                currIF->ifa_name);
+
+            FILE *stream = fopen(carrierPath, "r");
+            if (stream)
+            {
+                int carrierStatus = fgetc(stream);
+                fclose(stream);
+                carrierUp = (carrierStatus == '1');
+            }
+        }
+        NET_IFS[NET_IFS_NO].up = adminUp && carrierUp;
 
         NET_IFS_NO++;
     }
@@ -2062,6 +2078,8 @@ void showNetSelectIfs(void)
     {
         if (fullRedraw)
         {
+            loadNetIfs();
+
             // Mark/unmark the active interfaces
             for (int i = 0; i < menuSize; i++)
             {
