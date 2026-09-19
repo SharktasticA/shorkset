@@ -2490,7 +2490,7 @@ void toggleNetIf(const char *id)
 
         int carrierReady = 0;
         // Make sure carrier is ready (and wait for up to 10 secs if not)
-        for (int i = 0; i < 100; i++)
+        for (int i = 0; i < 10; i++)
         {
             FILE *carrierFile = fopen(carrierPath, "r");
             if (carrierFile)
@@ -2503,13 +2503,28 @@ void toggleNetIf(const char *id)
                     break;
                 }
             }
-            usleep(100000);
+            sleep(1);
         }
         if (!carrierReady)
         {
-            EXIT_MSG = strdup("ERROR: network interface carrier was not "
-                "ready before timeout");
-            exit(1);
+            netIf->up = 0;
+
+            char msgTitle[MENU_ITEM_NAME_LEN];
+            snprintf(msgTitle, MENU_ITEM_NAME_LEN, "Could not establish a "
+                "connection");
+            char msgBody[350] = "The network interface carrier did not "
+                "become ready after 10 seconds. Please ensure that your "
+                "ethernet cable is plugged in and properly seated at both "
+                "ends, that your ethernet cable or ports on both ends are "
+                "not damaged, and that your router/switch works.";
+
+            WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+                NULL, 0, 0);
+            printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+            free(wrapped->str);
+            free(wrapped);
+
+            return;
         }
 
         pid_t pid = fork();
