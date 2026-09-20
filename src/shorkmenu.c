@@ -216,17 +216,17 @@ NavInput getNavInput(void)
  */
 void markEntry(char *name, const char *col, const int noAst)
 {
-    if (name[0] != '\x1b')
-    {
-        char buffer[MENU_ITEM_NAME_LEN];
-        if (noAst)
-            snprintf(buffer, MENU_ITEM_NAME_LEN, "\x1b[%sm%s\x1b[0m", col,
-                name);
-        else
-            snprintf(buffer, MENU_ITEM_NAME_LEN, "\x1b[%sm*%s\x1b[0m", col,
-                name);
-        strcpy(name, buffer);
-    }
+    if (name[0] == '\x1b' || (!noAst && name[0] == '*'))
+        return;
+    
+    char buffer[MENU_ITEM_NAME_LEN];
+    const char *ast = noAst ? "" : "*";
+    if (col == NULL)
+        snprintf(buffer, MENU_ITEM_NAME_LEN, "%s%s", ast, name);
+    else
+        snprintf(buffer, MENU_ITEM_NAME_LEN, "\x1b[%sm%s%s\x1b[0m", col,
+            ast, name);
+    strcpy(name, buffer);
 }
 
 /**
@@ -963,7 +963,7 @@ void showDialog(char *message, int width)
  */
 void unmarkEntry(char *name)
 {
-    if (name[0] == '\x1b')
+    if (name[0] == '\x1b' || name[0] == '*')
     {
         char *ast = strchr(name, '*');
         if (ast)

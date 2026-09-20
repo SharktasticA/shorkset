@@ -24,6 +24,7 @@
 #define CSV_BUFFER                  16384
 #define CONFIG_FONT_COL_NAME_LEN    32
 #define CONFIG_FONT_COL_ANSI_LEN    32
+#define CONFIG_GPM_TYPE_LEN         16
 #define CONFIG_MODULES_LEN          1024
 #define CONFIG_NET_IFS_LEN          1024
 #define CONFONTS_DIR                "/usr/share/consolefonts"
@@ -52,6 +53,14 @@ typedef struct {
     char fontColANSI[CONFIG_FONT_COL_ANSI_LEN];
     // Font PSF path (default: "default")
     char fontPSF[PATH_MAX];
+    // gpm mouse device path (default: "/dev/input/mice")
+    char gpmDev[PATH_MAX];
+    // gpm enabled (default: 0)
+    int gpmEnabled;
+    // gpm responsiveness (default: 10)
+    int gpmResp;
+    // gpm mouse type (default: "imps2")
+    char gpmType[CONFIG_GPM_TYPE_LEN];
     // Keyboard layout (keymap) path (default: "qwerty_en_us")
     char keymap[PATH_MAX];
     // Linux modules to load at system startup
@@ -137,10 +146,15 @@ void showDispResMenu(void);
 void showDriverCatsMenu(void);
 void showDriversListMenu(const char*);
 void showFontColMenu(void);
+void showFontMenu(void);
 void showFontPSFMenu(void);
+void showGpmMenu(void);
+void showGpmRespMenu(void);
+void showGpmTypeMenu(void);
 void showHelp(void);
 void showKeymapMenu(void);
 void showMainMenu(void);
+void showMouseMenu(void);
 void showNetDriversMenu(void);
 void showNetManMenu(void);
 void showNetSelectIfs(void);

@@ -41,6 +41,10 @@ Config CONFIG = {
     "white",
     "0;37",
     "default",
+    "/dev/input/mice",
+    0,
+    10,
+    "imps2",
     "qwerty_en_us",
     "",
     0,
@@ -321,6 +325,14 @@ void loadConf(void)
                 snprintf(CONFIG.fontColANSI, CONFIG_FONT_COL_ANSI_LEN, "%s", value);
             else if (strncmp(buffer, "FONT_PSF=", 9) == 0)
                 snprintf(CONFIG.fontPSF, PATH_MAX, "%s", value);
+            else if (strncmp(buffer, "GPM_DEV=", 8) == 0)
+                snprintf(CONFIG.gpmDev, PATH_MAX, "%s", value);
+            else if (strncmp(buffer, "GPM_ENABLED=", 12) == 0)
+                CONFIG.gpmEnabled = atoi(value);
+            else if (strncmp(buffer, "GPM_RESP=", 9) == 0)
+                CONFIG.gpmResp = atoi(value);
+            else if (strncmp(buffer, "GPM_TYPE=", 9) == 0)
+                snprintf(CONFIG.gpmType, CONFIG_GPM_TYPE_LEN, "%s", value);
             else if (strncmp(buffer, "KEYMAP=", 7) == 0)
                 snprintf(CONFIG.keymap, PATH_MAX, "%s", value);
             else if (strncmp(buffer, "MODULES=", 7) == 0)
@@ -948,7 +960,7 @@ void showDispResMenu(void)
     {
         if (atoi(menu[i].id) == CONFIG.dispRes)
         {
-            strcat(menu[i].name, "*");
+            markEntry(menu[i].name, COL_FOR_GREEN, 0);
             cursorY = i + 1;
             break;
         }
@@ -993,27 +1005,14 @@ void showDispResMenu(void)
                 break;
 
             case ENTER:
-                clearScreen();
                 saveDispRes(menu[cursorY - 1], 0);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
-                    size_t len = strlen(menu[i].name);
                     if (atoi(menu[i].id) == CONFIG.dispRes)
-                    {
-                        // Add "*" only if not already present
-                        if (len == 0 || menu[i].name[len - 1] != '*')
-                        {
-                            strcat(menu[i].name, "*");
-                            cursorY = i + 1;
-                        }
-                    }
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
                     else
-                    {
-                        // Remove trailing "*" if present
-                        if (len > 0 && menu[i].name[len - 1] == '*')
-                            menu[i].name[len - 1] = '\0';
-                    }
+                        unmarkEntry(menu[i].name);
                 }
                 fullRedraw = 1;
                 break;
@@ -1171,23 +1170,20 @@ void showDriversListMenu(const char *cat)
     {
         snprintf(title, 32, "Toggle network interface driver");
         snprintf(msg, 300, "Select one or more drivers to load or unload "
-            "their Linux modules. Any driver marked in green with a "
-            "leading \"*\" is currently loaded. PCMCIA devices require a "
-            "PCMCIA bridge driver to be loaded first.");
+            "their Linux modules. PCMCIA devices require a PCMCIA bridge "
+            "driver to be loaded first.");
     }
     else if (strcmp(cat, "pbr") == 0)
     {
         snprintf(title, 32, "Toggle PCMCIA bridge driver");
         snprintf(msg, 200, "Select a driver to load or unload its Linux "
-            "module. The driver marked in green with a leading \"*\" is "
-            "currently loaded.");
+            "module.");
     }
     else if (strcmp(cat, "snd") == 0)
     {
         snprintf(title, 32, "Toggle sound card driver");
         snprintf(msg, 200, "Select a driver to load or unload its Linux "
-            "module. The driver marked in green with a leading \"*\" is "
-            "currently loaded.");
+            "module.");
     }
 
     while (running)
@@ -1355,7 +1351,6 @@ void showFontColMenu(void)
                 break;
 
             case ENTER:
-                clearScreen();
                 saveFontCol(menu[cursorY - 1]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
@@ -1380,6 +1375,105 @@ void showFontColMenu(void)
                 fullRedraw = 1;
                 break;
         
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
+void showFontMenu(void)
+{
+    MenuItem rawMenu[] = {
+        {
+            "col",
+            "Colour",
+            NULL,
+            showFontColMenu,
+            1
+        },
+        {
+            "psf",
+            "Style (PSF)",
+            NULL,
+            showFontPSFMenu,
+            loadConFonts()
+        }
+    };
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int menuSize = 0;
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isVisible)
+            menu[menuSize++] = rawMenu[i];
+    freeMenu(rawMenu, rawMenuSize);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Font");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                menu[cursorY - 1].action();
+                fullRedraw = 1;
+                break;
+
             case QUIT:
                 running = 0;
                 break;
@@ -1426,8 +1520,10 @@ void showFontPSFMenu(void)
         }
 
         // Add font
-        snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s", nameStr);
-        snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
+        snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s",
+            nameStr);
+        snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s",
+            nameStr);
         menu[menuSize].payload = strdup(CONFONTS[i]);
         menu[menuSize].action = NULL;
         menu[menuSize].isVisible = 1;
@@ -1455,7 +1551,7 @@ void showFontPSFMenu(void)
     {
         if (strcmp(menu[i].payload, CONFIG.fontPSF) == 0)
         {
-            strcat(menu[i].name, "*");
+            markEntry(menu[i].name, NULL, 0);
             cursorX = i / rows + 1;
             cursorY = i % rows + 1;
             break;
@@ -1467,9 +1563,9 @@ void showFontPSFMenu(void)
         if (fullRedraw)
         {
             clearScreen();
-            printHeader("Select font (PSF)");
+            printHeader("Select font style (PSF)");
             printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
-            printFooter("[jk] Navigate [Enter] Select [q] Back");
+            printFooter("[hjkl] Navigate [Enter] Select [q] Back");
         }
         else
         {
@@ -1524,10 +1620,8 @@ void showFontPSFMenu(void)
                 cursorXPrev = cursorX;
                 cursorYPrev = cursorY;
                 cursorY--;
-
                 if (cursorY < 1)
                     cursorY = rowsInCol(menuSize, rows, cursorX);
-
                 fullRedraw = 0;
                 break;
 
@@ -1535,36 +1629,20 @@ void showFontPSFMenu(void)
                 cursorXPrev = cursorX;
                 cursorYPrev = cursorY;
                 cursorY++;
-
                 if (cursorY > rowsInCol(menuSize, rows, cursorX))
                     cursorY = 1;
-                    
                 fullRedraw = 0;
                 break;
 
             case ENTER:
-                clearScreen();
                 saveFontPSF(menu[(cursorY - 1) + (cursorX - 1) * rows]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
-                    size_t len = strlen(menu[i].name);
                     if (strcmp(menu[i].payload, CONFIG.fontPSF) == 0)
-                    {
-                        // Add "*" only if not already present
-                        if (len == 0 || menu[i].name[len - 1] != '*')
-                        {
-                            strcat(menu[i].name, "*");
-                            cursorX = i / rows + 1;
-                            cursorY = i % rows + 1;
-                        }
-                    }
+                        markEntry(menu[i].name, NULL, 0);
                     else
-                    {
-                        // Remove trailing "*" if present
-                        if (len > 0 && menu[i].name[len - 1] == '*')
-                            menu[i].name[len - 1] = '\0';
-                    }
+                        unmarkEntry(menu[i].name);
                 }
                 fullRedraw = 1;
                 break;
@@ -1575,6 +1653,367 @@ void showFontPSFMenu(void)
 
             case INVALID:
                 fullRedraw = 0;
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
+void showGpmMenu(void)
+{
+    MenuItem rawMenu[] = {
+        {
+            "eng",
+            "Enable gpm",
+            NULL,
+            NULL,
+            1
+        },
+        {
+            "type",
+            "Mouse type",
+            NULL,
+            showGpmTypeMenu,
+            CONFIG.gpmEnabled
+        },
+        {
+            "resp",
+            "Responsiveness",
+            NULL,
+            showGpmRespMenu,
+            CONFIG.gpmEnabled
+        }
+    };
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int menuSize = 0;
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isVisible)
+            menu[menuSize++] = rawMenu[i];
+    freeMenu(rawMenu, rawMenuSize);
+
+    // Set enable/disable gpm item's default value
+    if (CONFIG.gpmEnabled)
+    {
+        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable gpm");
+        markEntry(menu[0].name, COL_FOR_GREEN, 1);
+    }
+    else
+    {
+        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable gpm");
+        markEntry(menu[0].name, COL_FOR_RED, 1);
+    }
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("General purpose mouse (gpm)");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                if (cursorY == 1)
+                {
+                    CONFIG.gpmEnabled = !CONFIG.gpmEnabled;
+                    writeConf();
+                    running = 0;
+                    showGpmMenu();
+                }
+                else
+                    menu[cursorY - 1].action();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
+/**
+ * Displays gpm responsiveness selection menu
+ */
+void showGpmRespMenu(void)
+{
+    const int menuSize = 20;
+    MenuItem menu[menuSize];
+    for (int i = 0; i < menuSize; i++)
+    {
+        int val = (i + 1) * 5;
+        snprintf(menu[i].id, MENU_ITEM_ID_LEN, "%d", val);
+        snprintf(menu[i].name, MENU_ITEM_NAME_LEN, "%d", val);
+        menu[i].payload = NULL;
+        menu[i].action = NULL;
+        menu[i].isVisible = 1;
+        menu[i].isStatic = 0;
+    }
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    // Mark the current responsiveness
+    char resp[12];
+    snprintf(resp, 12, "%d", CONFIG.gpmResp);
+    for (int i = 0; i < menuSize; i++)
+    {
+        if (strcmp(menu[i].id, resp) == 0)
+        {
+            markEntry(menu[i].name, COL_FOR_GREEN, 0);
+            cursorY = i + 1;
+            break;
+        }
+    }
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Select gpm responsiveness");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                CONFIG.gpmResp = atoi(menu[cursorY - 1].name);
+                writeConf();
+                // Update marked item
+                snprintf(resp, 12, "%d", CONFIG.gpmResp);
+                for (int i = 0; i < menuSize; i++)
+                {
+                    if (strcmp(menu[i].id, resp) == 0)
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
+                    else
+                        unmarkEntry(menu[i].name);
+                }
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
+/**
+ * Displays gpm mouse type selection menu
+ */
+void showGpmTypeMenu(void)
+{
+    MenuItem menu[] = {
+        {
+            "logi", "Serial - Logitech (logi)", NULL, NULL, 1
+        },
+        {
+            "mman", "Serial - Logitech MouseMan (mman)", NULL, NULL, 1
+        },
+        {
+            "bare", "Serial - Microsoft 2-button (bare)", NULL, NULL, 1
+        },
+        {
+            "ms", "Serial - Microsoft 3-button (ms)", NULL, NULL, 1
+        },
+        {
+            "ms+", "Serial - Microsoft 3-button w/ drag (ms+)", NULL, NULL, 1
+        },
+        {
+            "ms+lr", "Serial - Microsoft 3-button w/ recovery (ms+lr)", NULL, NULL, 1
+        },
+        {
+            "ms3", "Serial - Microsoft IntelliMouse (ms3)", NULL, NULL, 1
+        },
+        {
+            "msc", "Serial - MouseSystems (msc)", NULL, NULL, 1
+        },
+        {
+            "ps2", "PS/2 - General/TrackPoint (ps2)", NULL, NULL, 1
+        },
+        {
+            "imps2", "PS/2 - Microsoft IntelliMouse (imps2)", NULL, NULL, 1
+        },
+    };
+    int menuSize = sizeof(menu) / sizeof(menu[0]);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    // Mark the current type
+    for (int i = 0; i < menuSize; i++)
+    {
+        if (strcmp(menu[i].id, CONFIG.gpmType) == 0)
+        {
+            markEntry(menu[i].name, COL_FOR_GREEN, 0);
+            cursorY = i + 1;
+            break;
+        }
+    }
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Select gpm mouse type");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                snprintf(CONFIG.gpmType, CONFIG_GPM_TYPE_LEN, "%s",
+                    menu[cursorY - 1].id);
+                writeConf();
+                // Update marked item
+                for (int i = 0; i < menuSize; i++)
+                {
+                    if (strcmp(menu[i].id, CONFIG.gpmType) == 0)
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
+                    else
+                        unmarkEntry(menu[i].name);
+                }
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
                 break;
         }
     }
@@ -1641,9 +2080,11 @@ void showKeymapMenu(void)
             strcat(nameStr, "...");
         }
 
-        // Add font
-        snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s", nameStr);
-        snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s", nameStr);
+        // Add keymap
+        snprintf(menu[menuSize].id, sizeof(menu[menuSize].id), "%s",
+            nameStr);
+        snprintf(menu[menuSize].name, sizeof(menu[menuSize].name), "%s",
+            nameStr);
         menu[menuSize].payload = strdup(KEYMAPS[i]);
         menu[menuSize].action = NULL;
         menu[menuSize].isVisible = 1;
@@ -1651,20 +2092,29 @@ void showKeymapMenu(void)
         menuSize++;
     }
 
+    // Prepare for multi-column menu
+    int colWidth = 23;
+    int cols = TERM_SIZE.ws_col / (colWidth + 3);
+    if (cols < 1) cols = 1;
+    if (cols > menuSize) cols = menuSize;
+    int rows = (menuSize + cols - 1) / cols;
+
     int running = 1;
     int cursorX = 1;
     int cursorY = 1;
-    int cursorXPrev = 1;
+    int cursorXPrev = 0;
     int cursorYPrev = 0;
+    int maxY = 0;
     int fullRedraw = 1;
 
-    // Mark the current colour
+    // Mark the current keymap
     for (int i = 0; i < menuSize; i++)
     {
         if (strcmp(menu[i].id, CONFIG.keymap) == 0)
         {
-            strcat(menu[i].name, "*");
-            cursorY = i + 1;
+            markEntry(menu[i].name, NULL, 0);
+            cursorX = i / rows + 1;
+            cursorY = i % rows + 1;
             break;
         }
     }
@@ -1675,8 +2125,9 @@ void showKeymapMenu(void)
         {
             clearScreen();
             printHeader("Select keyboard layout");
-            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
-            printFooter("[jk] Navigate [Enter] Select [q] Back");
+            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX,
+                &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[hjkl] Navigate [Enter] Select [q] Back");
         }
         else
         {
@@ -1684,7 +2135,8 @@ void showKeymapMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX,
+                &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
@@ -1693,42 +2145,67 @@ void showKeymapMenu(void)
         cursorYPrev = 0;
         switch (input)
         {
+            case CURSOR_LEFT:
+                cursorXPrev = cursorX;
+                cursorYPrev = cursorY;
+                cursorX--;
+
+                if (cursorX < 1) cursorX = cols;
+                while ((maxY = rowsInCol(menuSize, rows, cursorX)) == 0)
+                {
+                    cursorX--;
+                    if (cursorX < 1) cursorX = cols;
+                }
+                if (cursorY > maxY) cursorY = maxY;
+                if (cursorY < 1) cursorY = maxY;
+
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_RIGHT:
+                cursorXPrev = cursorX;
+                cursorYPrev = cursorY;
+                cursorX++;
+
+                if (cursorX > cols) cursorX = 1;
+                while ((maxY = rowsInCol(menuSize, rows, cursorX)) == 0)
+                {
+                    cursorX++;
+                    if (cursorX > cols) cursorX = 1;
+                }
+                if (cursorY > maxY) cursorY = maxY;
+                if (cursorY < 1) cursorY = maxY;
+
+                fullRedraw = 0;
+                break;
+
             case CURSOR_UP:
+                cursorXPrev = cursorX;
                 cursorYPrev = cursorY;
                 cursorY--;
-                if (cursorY < 1) cursorY = menuSize;
+                if (cursorY < 1)
+                    cursorY = rowsInCol(menuSize, rows, cursorX);
                 fullRedraw = 0;
                 break;
 
             case CURSOR_DOWN:
+                cursorXPrev = cursorX;
                 cursorYPrev = cursorY;
                 cursorY++;
-                if (cursorY > menuSize) cursorY = 1;
+                if (cursorY > rowsInCol(menuSize, rows, cursorX))
+                    cursorY = 1;
                 fullRedraw = 0;
                 break;
 
             case ENTER:
-                clearScreen();
-                saveKeymap(menu[cursorY - 1]);
+                saveKeymap(menu[(cursorY - 1) + (cursorX - 1) * rows]);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
-                    size_t len = strlen(menu[i].name);
                     if (strcmp(menu[i].id, CONFIG.keymap) == 0)
-                    {
-                        // Add "*" only if not already present
-                        if (len == 0 || menu[i].name[len - 1] != '*')
-                        {
-                            strcat(menu[i].name, "*");
-                            cursorY = i + 1;
-                        }
-                    }
+                        markEntry(menu[i].name, NULL, 0);
                     else
-                    {
-                        // Remove trailing "*" if present
-                        if (len > 0 && menu[i].name[len - 1] == '*')
-                            menu[i].name[len - 1] = '\0';
-                    }
+                        unmarkEntry(menu[i].name);
                 }
                 fullRedraw = 1;
                 break;
@@ -1739,10 +2216,6 @@ void showKeymapMenu(void)
 
             case INVALID:
                 fullRedraw = 0;
-                break;
-
-            case CURSOR_LEFT:
-            case CURSOR_RIGHT:
                 break;
         }
     }
@@ -1788,18 +2261,18 @@ void showMainMenu(void)
             loadKeymaps()
         },
         {
-            "psf",
-            "Font (PSF)",
+            "fnt",
+            "Font",
             "",
-            showFontPSFMenu,
-            loadConFonts()
+            showFontMenu,
+            1
         },
         {
-            "col",
-            "Font colour",
+            "crsr",
+            "Mouse",
             "",
-            showFontColMenu,
-            1
+            showMouseMenu,
+            isProgramInstalled("gpm", 1)
         },
         {
             "net",
@@ -1893,6 +2366,101 @@ void showMainMenu(void)
     clearScreen();
 }
 
+/**
+ * Shows the mouse menu.
+ */
+void showMouseMenu(void)
+{
+    MenuItem rawMenu[] = {
+        {
+            "gpm",
+            "General purpose mouse (gpm)",
+            NULL,
+            showGpmMenu,
+            isProgramInstalled("gpm", 1)
+        }
+    };
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int realMenuSize = 0;
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isVisible)
+            menu[realMenuSize++] = rawMenu[i];
+    freeMenu(rawMenu, rawMenuSize);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Mouse");
+            printMenu(menu, rawMenuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                rawMenuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, rawMenuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                rawMenuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = rawMenuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > rawMenuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                menu[cursorY - 1].action();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+                break;
+        }
+    }
+
+    clearScreen();
+}
+
 void showNetDriversMenu(void)
 {
     showDriversListMenu("net");
@@ -1908,7 +2476,7 @@ void showNetManMenu(void)
             "enb", "Enable networking", NULL, NULL, 1
         },
         {
-            "aif", "Select interfaces", NULL, showNetSelectIfs,
+            "aif", "Interfaces", NULL, showNetSelectIfs,
             NET_IFS_NO > 0
         }
     };
@@ -2070,9 +2638,7 @@ void showNetSelectIfs(void)
     int cursorYPrev = 0;
     int fullRedraw = 1;
 
-    char msg[200] = "Select one or more network interfaces to activate or "
-        "deactivate them. Any interface marked in green with a leading "
-        "\"*\" currently activated.";
+    char msg[200] = "Select which network interfaces you want activated.";
 
     while (running)
     {
@@ -2090,7 +2656,7 @@ void showNetSelectIfs(void)
             }
 
             clearScreen();
-            printHeader("Available interfaces");
+            printHeader("Select network interfaces");
             printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
                 menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
@@ -2162,20 +2728,18 @@ void showSndDriversMenu(void)
  */
 void showVolumeMenu(void)
 {
-    MenuItem menu[] = {
-        { "0",      "0",    "", NULL,   1   },
-        { "10",     "10",   "", NULL,   1   },
-        { "20",     "20",   "", NULL,   1   },
-        { "30",     "30",   "", NULL,   1   },
-        { "40",     "40",   "", NULL,   1   },
-        { "50",     "50",   "", NULL,   1   },
-        { "60",     "60",   "", NULL,   1   },
-        { "70",     "70",   "", NULL,   1   },
-        { "80",     "80",   "", NULL,   1   },
-        { "90",     "90",   "", NULL,   1   },
-        { "100",    "100",  "", NULL,   1   }
-    };
-    int menuSize = sizeof(menu) / sizeof(menu[0]);
+    const int menuSize = 21;
+    MenuItem menu[menuSize];
+    for (int i = 0; i < menuSize; i++)
+    {
+        int val = i * 5;
+        snprintf(menu[i].id, MENU_ITEM_ID_LEN, "%d", val);
+        snprintf(menu[i].name, MENU_ITEM_NAME_LEN, "%d", val);
+        menu[i].payload = NULL;
+        menu[i].action = NULL;
+        menu[i].isVisible = 1;
+        menu[i].isStatic = 0;
+    }
 
     int running = 1;
     int cursorX = 1;
@@ -2191,7 +2755,7 @@ void showVolumeMenu(void)
     {
         if (strcmp(menu[i].id, vol) == 0)
         {
-            strcat(menu[i].name, "*");
+            markEntry(menu[i].name, COL_FOR_GREEN, 0);
             cursorY = i + 1;
             break;
         }
@@ -2236,28 +2800,15 @@ void showVolumeMenu(void)
                 break;
 
             case ENTER:
-                clearScreen();
                 saveVolume(menu[cursorY - 1]);
                 // Update marked item
                 snprintf(vol, 12, "%d", CONFIG.volume);
                 for (int i = 0; i < menuSize; i++)
                 {
-                    size_t len = strlen(menu[i].name);
                     if (strcmp(menu[i].id, vol) == 0)
-                    {
-                        // Add "*" only if not already present
-                        if (len == 0 || menu[i].name[len - 1] != '*')
-                        {
-                            strcat(menu[i].name, "*");
-                            cursorY = i + 1;
-                        }
-                    }
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
                     else
-                    {
-                        // Remove trailing "*" if present
-                        if (len > 0 && menu[i].name[len - 1] == '*')
-                            menu[i].name[len - 1] = '\0';
-                    }
+                        unmarkEntry(menu[i].name);
                 }
                 fullRedraw = 1;
                 break;
@@ -2601,6 +3152,10 @@ void writeConf(void)
     fprintf(stream, "FONT_COL_NAME=\"%s\"\n", CONFIG.fontColName);
     fprintf(stream, "FONT_COL_ANSI=\"%s\"\n", CONFIG.fontColANSI);
     fprintf(stream, "FONT_PSF=\"%s\"\n", CONFIG.fontPSF);
+    fprintf(stream, "GPM_DEV=\"%s\"\n", CONFIG.gpmDev);
+    fprintf(stream, "GPM_ENABLED=%d\n", CONFIG.gpmEnabled);
+    fprintf(stream, "GPM_RESP=%d\n", CONFIG.gpmResp);
+    fprintf(stream, "GPM_TYPE=\"%s\"\n", CONFIG.gpmType);
     fprintf(stream, "KEYMAP=\"%s\"\n", CONFIG.keymap);
     fprintf(stream, "MODULES=\"%s\"\n", CONFIG.modules);
     fprintf(stream, "NET_ENABLED=%d\n", CONFIG.netEnabled);
