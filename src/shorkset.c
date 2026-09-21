@@ -1532,7 +1532,7 @@ void showFontPSFMenu(void)
     }
 
     // Prepare for multi-column menu
-    int colWidth = 22;
+    int colWidth = 34;
     int cols = TERM_SIZE.ws_col / (colWidth + 3);
     if (cols < 1) cols = 1;
     if (cols > menuSize) cols = menuSize;
