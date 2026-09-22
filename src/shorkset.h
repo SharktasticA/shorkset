@@ -33,10 +33,12 @@
 #define KEYMAPS_DIR                 "/usr/share/keymaps"
 #define MAX_FONTS                   128
 #define MAX_KEYMAPS                 64
-#define MODULE_NAME_LEN             24
+#define MAX_MODULE_DEVS_ENTRIES     64
 #define MAX_MODULES_ENTRIES         128
 #define MAX_NET_IFS_ENTRIES         8
+#define MODULE_DESC_LEN             128
 #define MODULE_NAME_LEN             24
+#define MODULE_DEVS_CSV_PATH        "/usr/share/shorkset/module-devs.csv"
 #define MODULES_CSV_PATH            "/usr/share/shorkset/modules.csv"
 #define MODULES_DIR                 "/lib/modules"
 #define NET_IF_NAME_LEN             32
@@ -79,6 +81,11 @@ typedef struct {
 } LoadedModules;
 
 typedef struct {
+    char mod[MODULE_NAME_LEN];
+    char dev[MODULE_DESC_LEN];
+} ModuleDevice;
+
+typedef struct {
     char *name;
     char *category;
     char *bus;
@@ -107,7 +114,9 @@ extern int KEYMAPS_COUNT;
 extern int IS_NET_MODULES;
 extern int IS_PBR_MODULES;
 extern int IS_SND_MODULES;
+extern ModuleDevice MODULE_DEVS[MAX_MODULE_DEVS_ENTRIES];
 extern ModuleEntry MODULES[MAX_MODULES_ENTRIES];
+extern int MODULE_DEVS_NO;
 extern int MODULES_NO;
 extern NetIfEntry NET_IFS[MAX_NET_IFS_ENTRIES];
 extern int NET_IFS_NO;
@@ -134,6 +143,7 @@ ModuleEntry *getModuleFromName(const char*);
 void loadConf(void);
 int loadConFonts(void);
 int loadKeymaps(void);
+int loadModuleDevices(void);
 int loadModules(void);
 int loadNetIfs(void);
 void saveDispRes(MenuItem, int);
@@ -154,6 +164,7 @@ void showGpmTypeMenu(void);
 void showHelp(void);
 void showKeymapMenu(void);
 void showMainMenu(void);
+void showModuleDevices(const char*, const char*);
 void showMouseMenu(void);
 void showNetDriversMenu(void);
 void showNetManMenu(void);

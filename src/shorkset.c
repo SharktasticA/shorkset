@@ -61,7 +61,9 @@ int KEYMAPS_COUNT = 0;
 int IS_NET_MODULES = 0;
 int IS_PBR_MODULES = 0;
 int IS_SND_MODULES = 0;
+ModuleDevice MODULE_DEVS[MAX_MODULE_DEVS_ENTRIES] = {0};
 ModuleEntry MODULES[MAX_MODULES_ENTRIES] = {0};
+int MODULE_DEVS_NO = 0;
 int MODULES_NO = 0;
 NetIfEntry NET_IFS[MAX_NET_IFS_ENTRIES] = {0};
 int NET_IFS_NO = 0;
@@ -450,6 +452,86 @@ int loadKeymaps(void)
 
     qsort(KEYMAPS, KEYMAPS_COUNT, PATH_MAX, natCmp);
     return KEYMAPS_COUNT > 0;
+}
+
+/**
+ * Loads the contents of module-devices.csv into MODULE_DEVS.
+ * @returns 1 if successful; 0 if not
+ */
+int loadModuleDevices(void)
+{
+    // If no modules are found, no point loading this...
+    if (MODULES_NO == 0)
+        return 0;
+
+    // Load csv file
+    FILE *stream;
+    if (fileExists(MODULE_DEVS_CSV_PATH))
+        stream = fopen(MODULE_DEVS_CSV_PATH, "r");
+    else
+        return 0;
+
+    // Load csv into buffer
+    static char buffer[CSV_BUFFER];
+    size_t n = fread(buffer, 1, sizeof(buffer) - 1, stream);
+    fclose(stream);
+    buffer[n] = '\0';
+
+    char *p = buffer;
+
+    // Skip header line
+    while (*p && *p != '\n')
+        p++;
+    if (*p == '\n')
+        p++;
+
+    MODULE_DEVS_NO = 0;
+    while (*p && MODULE_DEVS_NO < MAX_MODULE_DEVS_ENTRIES)
+    {
+        char *line = p;
+
+        // Find end of line
+        while (*p && *p != '\n')
+            p++;
+        if (*p == '\n')
+        {
+            *p = '\0';
+            p++;
+        }
+
+        if (*line == '\0')
+            continue;
+
+        // Load line
+        char *fields[2];
+        int fieldCount = loadCSVLine(line, fields, 2);
+
+        // Check if malformed line/parsing
+        if (fieldCount < 2)
+            continue;
+
+        int fieldExists = 0;
+        for (int i = 0; i < MODULES_NO; i++)
+        {
+            if (strcmp(fields[0], MODULES[i].name) == 0)
+            {
+                fieldExists = 1;
+                break;
+            }
+        }
+
+        if (fieldExists)
+        {
+            // Input line into entries
+            snprintf(MODULE_DEVS[MODULE_DEVS_NO].mod, MODULE_NAME_LEN, "%s",
+                fields[0]);
+            snprintf(MODULE_DEVS[MODULE_DEVS_NO].dev, MODULE_DESC_LEN, "%s",
+                fields[1]);
+            MODULE_DEVS_NO++;
+        }
+    }
+
+    return 1;
 }
 
 /**
@@ -1027,6 +1109,8 @@ void showDispResMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -1125,6 +1209,8 @@ void showDriverCatsMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -1213,7 +1299,7 @@ void showDriversListMenu(const char *cat)
             printHeader(title);
             printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
                 menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
-            printFooter("[jk] Navigate [Enter] Toggle [q] Quit");
+            printFooter("[jk] Navigate [i] Get compatibility [Enter] Toggle [q] Quit");
         }
         else
         {
@@ -1251,7 +1337,12 @@ void showDriversListMenu(const char *cat)
                 if (strcmp(cat, "net") == 0)
                     loadNetIfs();
                 break;
-        
+
+            case INSPECT:
+                showModuleDevices(menu[cursorY - 1].id,
+                    menu[cursorY - 1].name);
+                break;
+
             case QUIT:
                 running = 0;
                 break;
@@ -1262,6 +1353,7 @@ void showDriversListMenu(const char *cat)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -1385,6 +1477,8 @@ void showFontColMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -1484,6 +1578,8 @@ void showFontMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -1654,6 +1750,10 @@ void showFontPSFMenu(void)
             case INVALID:
                 fullRedraw = 0;
                 break;
+
+            case INSPECT:
+                fullRedraw = 0;
+                break;
         }
     }
 
@@ -1779,6 +1879,8 @@ void showGpmMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -1887,6 +1989,8 @@ void showGpmRespMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -2014,6 +2118,8 @@ void showGpmTypeMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -2217,6 +2323,10 @@ void showKeymapMenu(void)
             case INVALID:
                 fullRedraw = 0;
                 break;
+
+            case INSPECT:
+                fullRedraw = 0;
+                break;
         }
     }
 
@@ -2236,6 +2346,7 @@ void showMainMenu(void)
     getCurrRes();
     getKernelVer();
     loadModules();
+    loadModuleDevices();
     loadNetIfs();
 
     MenuItem rawMenu[] = {
@@ -2359,11 +2470,68 @@ void showMainMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
 
     clearScreen();
+}
+
+/**
+ * Displays a list of devices the given module is suitable for. If none are
+ * found, it will simply advise the module may be compatible with clones of
+ * the devices in the module's name.
+ * @param id Module's id
+ * @param name Module's name
+ */
+void showModuleDevices(const char *id, const char *name)
+{
+    int foundDevs = 0;
+    char devList[4096] = "It is possible that there are other devices this "
+        "driver module may support. If you find such a device not on this "
+        "list, please report compatibility via the SHORK 486 or SHORKSET "
+        "GitHub repositories.\n\n";
+    for (int i = 0; i < MODULE_DEVS_NO; i++)
+    {
+        if (strcmp(id, MODULE_DEVS[i].mod) == 0)
+        {
+            foundDevs = 1;
+            int len = strlen(devList);
+            snprintf(devList + len, sizeof(devList) - len, " * %s\n",
+                MODULE_DEVS[i].dev);
+        }
+    }
+
+    char msgTitle[MENU_ITEM_NAME_LEN];
+    snprintf(msgTitle, MENU_ITEM_NAME_LEN, "Devices compatible with %s",
+        name);
+
+    if (foundDevs)
+    {
+        WORD_WRAPPED *wrapped = wordWrap(devList, TERM_SIZE.ws_col, NULL,
+            0, 0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
+    }
+    else
+    {
+        char msgBody[400] = "No compatible device list for this driver "
+            "module is available (yet). Besides any devices referred to in "
+            "the given driver module name, there may be other devices that "
+            "this driver module may support. If you find a device "
+            "compatible with this driver module that is not referred to "
+            "anywhere, please report compatibility via the SHORK 486 or "
+            "SHORKSET GitHub repositories.";
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+            NULL, 0, 0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
+    }
 }
 
 /**
@@ -2454,6 +2622,8 @@ void showMouseMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -2590,6 +2760,8 @@ void showNetManMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -2706,6 +2878,8 @@ void showNetSelectIfs(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }
@@ -2823,6 +2997,8 @@ void showVolumeMenu(void)
 
             case CURSOR_LEFT:
             case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
                 break;
         }
     }

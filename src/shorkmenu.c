@@ -202,6 +202,7 @@ NavInput getNavInput(void)
             case 'j': return CURSOR_DOWN;
             case 'k': return CURSOR_UP;
             case 'l': return CURSOR_RIGHT;
+            case 'i': return INSPECT;
         }
     }
 

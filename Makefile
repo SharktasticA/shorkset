@@ -30,10 +30,12 @@ install: shorkset
 
 	install -d $(DESTDIR)$(DATDIR)
 	install -m 644 modules.csv $(DESTDIR)$(DATDIR)
+	install -m 644 module-devs.csv $(DESTDIR)$(DATDIR)
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/shorkset
 	rm -f $(DESTDIR)$(CONFDIR)/shorkset.conf
 	rm -f $(DESTDIR)$(DATDIR)/modules.csv
+	rm -f $(DESTDIR)$(DATDIR)/module-devs.csv
 
 clean:
 	rm -f shorkset

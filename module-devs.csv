@@ -1,0 +1,56 @@
+Module,Device
+3c574_cs,3Com 3c574 Fast EtherLink
+3c589_cs,3Com 3c589 EtherLink III
+3c589_cs,Farallon EtherWave/EtherMac
+3c589_cs,Motorola Marquis
+axnet_cs,(Generic) 100BASE
+axnet_cs,(Generic) FastEtherCard
+axnet_cs,(Generic) FEP501
+axnet_cs,AmbiCom AMB8110 Fast Ethernet
+axnet_cs,ASIX AX88190
+axnet_cs,Billionton LNA-100B
+axnet_cs,CHEETAH ETHERCARD EN2228
+axnet_cs,CNet CNF301
+axnet_cs,corega FEther PCC-TXD
+axnet_cs,corega FEther PCC-TXM
+axnet_cs,corega FEtherII PCC-TXD
+axnet_cs,Dynalink L100C16
+axnet_cs,IO DATA ETX-PCM
+axnet_cs,Linksys PCMPC100 EtherFast 10/100 (V3)
+axnet_cs,MELCO LPC3-TX
+axnet_cs,NETGEAR FA411
+axnet_cs,Network Everywhere AX88190
+fmvj18x_cs,(Generic) LAN MBH10304 ES
+fmvj18x_cs,(Generic) MBH10302
+fmvj18x_cs,EAGLE NE200 ETHERNET LAN MBH10302 04
+fmvj18x_cs,Eiger EPX-10BT PC Card Ethernet 10BT
+fmvj18x_cs,FUJITSU FMV-J182 LAN
+fmvj18x_cs,FUJITSU MBH10308
+fmvj18x_cs,FUJITSU TOWA LA501
+fmvj18x_cs,HITACHI HT-4840-11
+fmvj18x_cs,NEC PK-UG-J001
+fmvj18x_cs,NextCom NC5310
+fmvj18x_cs,NextCom NC5310B
+fmvj18x_cs,RATOC REX-R280
+fmvj18x_cs,TDK GlobalNetworker 3410/3412
+fmvj18x_cs,TDK LAC-CD02x
+fmvj18x_cs,TDK LAC-CF010
+fmvj18x_cs,UBKK V2.0
+nmclan_cs,New Media Ethernet
+nmclan_cs,Portable Add-ons Ethernet+
+xirc2ps_cs,Compaq CPQ-10/100 Netelligent 10/100
+xirc2ps_cs,Compaq Ethernet LAN
+xirc2ps_cs,Intel EtherExpress PRO/100
+xirc2ps_cs,Toshiba 10/100 Ethernet
+xirc2ps_cs,Toshiba TPCENET
+xirc2ps_cs,Xircom CE2-10 CreditCard Ethernet
+xirc2ps_cs,Xircom CE3-10/100 CreditCard Ethernet 10/100
+xirc2ps_cs,Xircom CEM2 CreditCard Ethernet + Modem II
+xirc2ps_cs,Xircom CEM28 CreditCard Ethernet + Modem 28
+xirc2ps_cs,Xircom CEM33 CreditCard Ethernet + Modem 33
+xirc2ps_cs,Xircom CEM56 CreditCard Ethernet 10/100 + Modem 56
+xirc2ps_cs,Xircom R2E-100BTX RealPort2 Ethernet 10/100
+xirc2ps_cs,Xircom RE-10 RealPort Ethernet 10
+xirc2ps_cs,Xircom RE-100 RealPort Ethernet 10/100
+xirc2ps_cs,Xircom REM10
+xirc2ps_cs,Xircom XEM5600 RealPort 10/100 LAN + 56k Modem

@@ -35,6 +35,7 @@ typedef enum
     CURSOR_UP,
     CURSOR_LEFT,
     CURSOR_RIGHT,
+    INSPECT,
     QUIT,
     ENTER,
     INVALID
