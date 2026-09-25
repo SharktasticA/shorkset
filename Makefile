@@ -3,7 +3,7 @@ AR ?= ar
 RANLIB ?= ranlib
 STRIP ?= strip
 
-CFLAGS += -I.
+CFLAGS += -D_GNU_SOURCE -std=gnu99 -I. -Os
 LDFLAGS += -static
 
 ifdef FB

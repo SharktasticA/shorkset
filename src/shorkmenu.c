@@ -5,7 +5,7 @@
     ## An interactive menu system for SHORK UTILITIES & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision C                                       ##
+    ## Revision D                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -402,6 +402,8 @@ void printFooter(char *footnote)
  */
 void printHeader(char *title)
 {
+    unmarkEntry(title);
+
     if (COL_ENABLED)
         printf("\033[%s;%sm", COL_FOR_BAR, COL_BAK_BAR);
 

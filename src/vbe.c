@@ -35,6 +35,11 @@ int MODE_LIST_LOADED = 0;
 
 
 
+static void * __attribute__((noinline)) xferPtr(void)
+{
+    return (void*)(uintptr_t)XFER_ADDR;
+}
+
 /**
  * Loads MODE_LIST with supported VESA mode numbers found from a AX=4F00h call.
  * @return 1 if at least one mode loaded; 0 if none or error
@@ -127,7 +132,7 @@ int vbeGetInfo(VBE_INFO_BLOCK *out)
     if (!VBE_INITIALISED || !out)
         return 0;
 
-    memset((void*)(uintptr_t)XFER_ADDR, 0, sizeof(VBE_INFO_BLOCK));
+    memset(xferPtr(), 0, sizeof(VBE_INFO_BLOCK));
 
     VM86_REGS regs;
     memset(&regs, 0, sizeof(regs));
@@ -141,7 +146,7 @@ int vbeGetInfo(VBE_INFO_BLOCK *out)
     if ((regs.eax & 0xFFFF) != VBE_SUCESS)
         return 0;
 
-    memcpy(out, (void*)(uintptr_t)XFER_ADDR, sizeof(VBE_INFO_BLOCK));
+    memcpy(out, xferPtr(), sizeof(VBE_INFO_BLOCK));
     return 1;
 }
 
@@ -157,7 +162,7 @@ int vbeGetModeInfo(int vesaMode, VBE_INFO_MODE_BLOCK *out)
     if (!VBE_INITIALISED || !out)
         return 0;
 
-    memset((void*)(uintptr_t)XFER_ADDR, 0, sizeof(VBE_INFO_MODE_BLOCK));
+    memset(xferPtr(), 0, sizeof(VBE_INFO_MODE_BLOCK));
 
     VM86_REGS regs;
     memset(&regs, 0, sizeof(regs));
@@ -172,7 +177,7 @@ int vbeGetModeInfo(int vesaMode, VBE_INFO_MODE_BLOCK *out)
     if ((regs.eax & 0xFFFF) != VBE_SUCESS)
         return 0;
 
-    memcpy(out, (void*)(uintptr_t)XFER_ADDR, sizeof(VBE_INFO_MODE_BLOCK));
+    memcpy(out, xferPtr(), sizeof(VBE_INFO_MODE_BLOCK));
     return 1;
 }
 

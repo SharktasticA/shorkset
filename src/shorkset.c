@@ -781,10 +781,14 @@ void saveDispRes(MenuItem itm, int skipMsg)
     {
         char msgTitle[MENU_ITEM_NAME_LEN];
         snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
-        char msgBody[320] = "The selected display resolution has been saved. If you selected a VGA resolution and had selected a PSF font before, the latter setting will now be discarded as PSF fonts dictate their own VGA resolution. A system restart is required before the changes will take effect.";
+        char msgBody[320] = "The selected display resolution has been "
+            "saved. If you selected a VGA resolution and had selected a "
+            "PSF font before, the latter setting will now be discarded as "
+            "PSF fonts dictate their own VGA resolution. A system restart "
+            "is required before the changes will take effect.";
 
-        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
-            0);
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
+            NULL, 0, 0);
         printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
         free(wrapped->str);
         free(wrapped);
@@ -808,7 +812,8 @@ void saveFontCol(MenuItem itm)
     snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.payload);
     char msgBody[320] = "The selected font colour has been saved and will be applied once you exit SHORKSET. If there are any other active virtual terminals (ttyX), you may need to enter \"exit\" when convenient, or restart your computer before this change will take complete effect.";
 
-    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
+    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, NULL,
+        0, 0);
     printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
     free(wrapped->str);
     free(wrapped);
@@ -828,8 +833,8 @@ void saveFontPSF(MenuItem itm)
         char msgTitle[MENU_ITEM_NAME_LEN] = "default";
         char msgBody[320] = "The PSF font will be reset to default. If a PSF font other than \"default\" was previously selected, you must restart your computer before this change will take effect.";
 
-        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
-            0);
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
+            NULL, 0, 0);
         printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
         free(wrapped->str);
         free(wrapped);
@@ -855,8 +860,8 @@ void saveFontPSF(MenuItem itm)
         snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
         char msgBody[320] = "The selected PSF font has been saved and will be applied once you exit SHORKSET. If you had selected a VGA display resolution before, that setting will now be discarded as the PSF font will dictate its own VGA resolution. VBE display resolutions are unaffected.";
 
-        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0,
-            0);
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
+            NULL, 0, 0);
         printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
         free(wrapped->str);
         free(wrapped);
@@ -880,7 +885,8 @@ void saveKeymap(MenuItem itm)
     snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
     char msgBody[320] = "The selected keyboard layout has been applied.";
 
-    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
+    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, NULL,
+        0, 0);
     printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
     free(wrapped->str);
     free(wrapped);
@@ -895,15 +901,6 @@ void saveVolume(MenuItem itm)
     CONFIG.volume = atoi(itm.name);
     applyVolume(CONFIG.volume);
     writeConf();
-
-    /*char msgTitle[MENU_ITEM_NAME_LEN];
-    snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
-    char msgBody[320] = "The selected volume level has been applied.";
-
-    WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL, 0, 0);
-    printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
-    free(wrapped->str);
-    free(wrapped);*/
 }
 
 /**
@@ -1860,6 +1857,15 @@ void showGpmMenu(void)
                 if (cursorY == 1)
                 {
                     CONFIG.gpmEnabled = !CONFIG.gpmEnabled;
+                    if (!CONFIG.gpmEnabled)
+                        killProc("gpm");
+                    else
+                    {
+                        char respStr[12];
+                        snprintf(respStr, 12, "%d", CONFIG.gpmResp);
+                        runCmd("gpm", "-m", CONFIG.gpmDev, "-r", respStr,
+                            "-t", CONFIG.gpmType, NULL);
+                    }
                     writeConf();
                     running = 0;
                     showGpmMenu();
@@ -1967,6 +1973,12 @@ void showGpmRespMenu(void)
             case ENTER:
                 CONFIG.gpmResp = atoi(menu[cursorY - 1].name);
                 writeConf();
+                // Apply new gpm settings immediately
+                killProc("gpm");
+                char respStr[12];
+                snprintf(respStr, 12, "%d", CONFIG.gpmResp);
+                runCmd("gpm", "-m", CONFIG.gpmDev, "-r", respStr, "-t",
+                    CONFIG.gpmType, NULL);
                 // Update marked item
                 snprintf(resp, 12, "%d", CONFIG.gpmResp);
                 for (int i = 0; i < menuSize; i++)
@@ -2097,6 +2109,12 @@ void showGpmTypeMenu(void)
                 snprintf(CONFIG.gpmType, CONFIG_GPM_TYPE_LEN, "%s",
                     menu[cursorY - 1].id);
                 writeConf();
+                // Apply new gpm settings immediately
+                killProc("gpm");
+                char respStr[12];
+                snprintf(respStr, 12, "%d", CONFIG.gpmResp);
+                runCmd("gpm", "-m", CONFIG.gpmDev, "-r", respStr, "-t",
+                    CONFIG.gpmType, NULL);
                 // Update marked item
                 for (int i = 0; i < menuSize; i++)
                 {
@@ -2511,7 +2529,7 @@ void showModuleDevices(const char *id, const char *name)
     if (foundDevs)
     {
         WORD_WRAPPED *wrapped = wordWrap(devList, TERM_SIZE.ws_col, NULL,
-            0, 0);
+            NULL, 0, 0);
         printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
         free(wrapped->str);
         free(wrapped);
@@ -2527,7 +2545,7 @@ void showModuleDevices(const char *id, const char *name)
             "SHORKSET GitHub repositories.";
 
         WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
-            NULL, 0, 0);
+            NULL, NULL, 0, 0);
         printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
         free(wrapped->str);
         free(wrapped);
@@ -3045,7 +3063,7 @@ void toggleDriver(const ModuleEntry *mod)
                 "select a PCMCIA bridge, before returning here.";
 
             WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
-                NULL, 0, 0);
+                NULL, NULL, 0, 0);
             printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
             free(wrapped->str);
             free(wrapped);
@@ -3074,7 +3092,7 @@ void toggleDriver(const ModuleEntry *mod)
                 "are trying the correct driver.";
 
             WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
-                NULL, 0, 0);
+                NULL, NULL, 0, 0);
             printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
             free(wrapped->str);
             free(wrapped);
@@ -3119,7 +3137,7 @@ void toggleDriver(const ModuleEntry *mod)
                 "reboot.";
 
             WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
-                NULL, 0, 0);
+                NULL, NULL, 0, 0);
             printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
             free(wrapped->str);
             free(wrapped);
@@ -3264,7 +3282,7 @@ void toggleNetIf(const char *id)
                 "not damaged, and that your router/switch works.";
 
             WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
-                NULL, 0, 0);
+                NULL, NULL, 0, 0);
             printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
             free(wrapped->str);
             free(wrapped);

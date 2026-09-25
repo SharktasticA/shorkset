@@ -5,7 +5,7 @@
     ## An interactive menu system for SHORK UTILITIES & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision C                                       ##
+    ## Revision D                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################

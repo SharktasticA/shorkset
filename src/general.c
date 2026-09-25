@@ -5,7 +5,7 @@
     ## General, utility functions for SHORK Utilities & ##
     ## SHORK ENTERTAINMENT                              ##
     ######################################################
-    ## Revision D                                       ##
+    ## Revision G                                       ##
     ######################################################
     ## Licence: GNU GENERAL PUBLIC LICENSE Version 3    ##
     ######################################################
@@ -33,13 +33,16 @@
 
 
 /**
- * Converts a data value into a string formatted into a unit that makes sense for
- * its magnitude with its new unit added to the end.
+ * Converts a data value into a string formatted into a unit that makes
+ * sense for its magnitude with its new unit added to the end.
  * @param from Unit the input value is in (e.g., "B", "KiB")
  * @param val Input value to convert
- * @return String containing the converted value and its new unit (e.g., "1.5MiB")
+ * @param maxUnit Largest unit to use (e.g., 'M' to allow just B, KiB and
+ *                MiB)
+ * @return String containing the converted value and its new unit (e.g.,
+ *         "1.5MiB")
  */
-char *bytesToReadable(const char *from, const long long val)
+char *bytesToReadable(const char *from, const long long val, char maxUnit)
 {
     long long bytes = val;
     if (strcmp(from, "KiB") == 0)
@@ -50,7 +53,10 @@ char *bytesToReadable(const char *from, const long long val)
         bytes *= 1024LL * 1024 * 1024;
     else if (strcmp(from, "TiB") == 0)
         bytes *= 1024LL * 1024 * 1024 * 1024;
+    else if (strcmp(from, "PiB") == 0)
+        bytes *= 1024LL * 1024 * 1024 * 1024 * 1024;
 
+    const long long PiB = 1024LL * 1024 * 1024 * 1024 * 1024;
     const long long TiB = 1024LL * 1024 * 1024 * 1024;
     const long long GiB = 1024LL * 1024 * 1024;
     const long long MiB = 1024LL * 1024;
@@ -62,7 +68,54 @@ char *bytesToReadable(const char *from, const long long val)
     long long whole, remainder;
     int decimal;
 
-    if (bytes >= TiB)
+    int unitRank = 0;
+    switch (maxUnit)
+    {
+        case 'b':
+        case 'B':
+            unitRank = 0;
+            break;
+        case 'k':
+        case 'K':
+            unitRank = 1;
+            break;
+        case 'm':
+        case 'M':
+            unitRank = 2;
+            break;
+        case 'g':
+        case 'G':
+            unitRank = 3;
+            break;
+        case 't':
+        case 'T':
+            unitRank = 4;
+            break;
+        case 'p':
+        case 'P':
+        default:
+            unitRank = 5;
+            break;
+    }
+
+    if (bytes >= PiB && unitRank >= 5)
+    {
+        whole = bytes / PiB;
+        remainder = bytes % PiB;
+
+        if (COMPACT)
+        {
+            if (remainder > 0) whole++;
+            snprintf(result, resultSize, "%lldP", whole);
+            return result;
+        }
+
+        decimal = (int)((remainder * 10 + PiB / 2) / PiB);
+        if (decimal == 10) { whole++; decimal = 0; }
+        if (decimal == 0) snprintf(result, resultSize, "%lldPiB", whole);
+        else snprintf(result, resultSize, "%lld.%dPiB", whole, decimal);
+    }
+    else if (bytes >= TiB && unitRank >= 4)
     {
         whole = bytes / TiB;
         remainder = bytes % TiB;
@@ -79,7 +132,7 @@ char *bytesToReadable(const char *from, const long long val)
         if (decimal == 0) snprintf(result, resultSize, "%lldTiB", whole);
         else snprintf(result, resultSize, "%lld.%dTiB", whole, decimal);
     }
-    else if (bytes >= GiB)
+    else if (bytes >= GiB && unitRank >= 3)
     {
         whole = bytes / GiB;
         remainder = bytes % GiB;
@@ -96,7 +149,7 @@ char *bytesToReadable(const char *from, const long long val)
         if (decimal == 0) snprintf(result, resultSize, "%lldGiB", whole);
         else snprintf(result, resultSize, "%lld.%dGiB", whole, decimal);
     }
-    else if (bytes >= MiB)
+    else if (bytes >= MiB && unitRank >= 2)
     {
         whole = bytes / MiB;
         remainder = bytes % MiB;
@@ -113,7 +166,7 @@ char *bytesToReadable(const char *from, const long long val)
         if (decimal == 0) snprintf(result, resultSize, "%lldMiB", whole);
         else snprintf(result, resultSize, "%lld.%dMiB", whole, decimal);
     }
-    else if (bytes >= KiB)
+    else if (bytes >= KiB && unitRank >= 1)
     {
         whole = bytes / KiB;
         remainder = bytes % KiB;
@@ -544,6 +597,56 @@ char *findReplace(const char *input, const int inputSize, const char *needle, co
 }
 
 /**
+ * Finds first match from list among running processes names via /proc.
+ * @param procNames List of process names to find
+ * @return index of match if found; -1 if not found or error
+ */
+int findProcs(const char* const procNames[])
+{
+    DIR *proc = opendir("/proc");
+    if (!proc)
+        return 0;
+
+    struct dirent *entry;
+    while ((entry = readdir(proc)) != NULL)
+    {
+        // Skip non-numeric (not PID) entries
+        if (entry->d_name[0] < '0' || entry->d_name[0] > '9')
+            continue;
+
+        // Build path to process' comm (command) file
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "/proc/%s/comm", entry->d_name);
+
+        FILE *commFile = fopen(path, "r");
+        if (!commFile)
+            continue;
+
+        char commVal[TASK_COMM_LEN];
+        
+        int error = fgets(commVal, TASK_COMM_LEN, commFile) == NULL;
+        fclose(commFile);
+        if (error)
+            continue;
+
+        // Strip trailing newline
+        commVal[strcspn(commVal, "\n")] = '\0';
+
+        for (int i = 0; procNames[i]; i++)
+        {
+            if ( strstr(commVal, procNames[i]) != NULL )
+            {
+                closedir(proc);
+                return i;
+            }
+        }
+    }
+    
+    closedir(proc);
+    return -1;
+}
+
+/**
  * DEPRECATED: Use wordWrap() instead!
  * Adds new lines to a given string based on the requested line width.
  * @param input Input string
@@ -856,6 +959,59 @@ int iSqrt(int x)
 }
 
 /**
+ * Sends SIGTERM to all processes that match the given name.
+ * @param name Process name to find
+ * @return Number of processes SIGTERM'd; -1 if failed
+ */
+int killProc(const char *name)
+{
+    DIR *proc = opendir("/proc");
+    if (!proc)
+        return -1;
+
+    int kills = 0;
+    pid_t self = getpid();
+    struct dirent *entry;
+    while ((entry = readdir(proc)) != NULL)
+    {
+        // Skip non-numeric (not PID) entries
+        if (entry->d_name[0] < '0' || entry->d_name[0] > '9')
+            continue;
+
+        // If self, skip
+        pid_t pid = (pid_t)strtol(entry->d_name, NULL, 10);
+        if (pid == self)
+            continue;
+    
+        // Build path to process' comm (command) file
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "/proc/%s/comm", entry->d_name);
+
+        char commPath[PATH_MAX];
+        snprintf(commPath, sizeof(commPath), "/proc/%d/comm", pid);
+
+        FILE *commFile = fopen(path, "r");
+        if (!commFile) continue;
+
+        char commVal[TASK_COMM_LEN];
+        
+        int error = fgets(commVal, TASK_COMM_LEN, commFile) == NULL;
+        fclose(commFile);
+        if (error)
+            continue;
+
+        // Strip trailing newline
+        commVal[strcspn(commVal, "\n")] = '\0';
+
+        if (strcmp(commVal, name) == 0 && kill(pid, SIGTERM) == 0)
+            kills++;
+    }
+    closedir(proc);
+
+    return kills;
+}
+
+/**
  * Reduces a given string to the given maximum lines by counting '\n' escape
  * codes.
  * @param str Input string
@@ -1155,17 +1311,20 @@ void splitText(char *text, char *textLines[], int totalLines)
 }
 
 /**
- * Word-wraps a given string based on the requested width, optionalling adding
+ * Word-wraps a given string based on the requested width, optionally adding
  * indents to the start of each newly-made line.
  * @param input Input string
  * @param width Number of characters per line
- * @param indent Indent to include after a wrap
+ * @param indent Indent to include after a wrap (NULL to disable)
+ * @param prefix Prefixing substring to also take into account when wrapping
+ *               (NULL to disable feature)
  * @param hardBreak Flags if the function should hard-break words if needed
  * @param trim Flags that any trailing newlines should be removed
- * @return Malloc'd WORD_WRAPPED struct containing the result string, how long
- *         it is & how many lines it has
+ * @return Malloc'd WORD_WRAPPED struct containing the result string, how
+ *         long it is & how many lines it has
  */
-WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int trim)
+WORD_WRAPPED *wordWrap(char *input, int width, char *indent, char *prefix,
+    int hardBreak, int trim)
 {
     if (!input || width < 1)
         return NULL;
@@ -1173,6 +1332,34 @@ WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int 
     // Initialse variables that help us track progress
     int inputStrLen = strlen(input);
     int indentLen = indent ? strlen(indent) : 0;
+    int prefixLen = 0;
+    if (prefix)
+    {
+        char *p = prefix;
+        while (*p)
+        {
+            // prefix may contain ANSI colour escape codes, so we want to
+            // calculate prefixLen excluding them
+            if (*p == '\x1b' && p[1] == '[')
+            {
+                // Skip ESC and '['
+                p += 2;
+                // Skip parameters
+                while (*p && *p != 'm')
+                    p++;
+                // Skip final 'm'
+                if (*p == 'm')
+                    p++;
+            }
+            else
+            {
+                // Count visible character
+                prefixLen++;
+                p++;
+            }
+        }
+    }
+
     // Count of lines found in the ouptu
     int lines = 1;
     // Index of the most recent breakable character
@@ -1182,6 +1369,13 @@ WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int 
     // The current size of the line being processed 
     int widthCount = 1;
 
+    // Flags if the line being processed contains the prefix
+    int hasPrefix = 0;
+    // Flags if prefix is at the start of the line
+    int prefixAtStart = (prefixLen == 0);
+    // Flags if prefix is after an indent
+    int prefixAtIndent = (prefixLen == 0);
+
     // Allocate a buffer for the result string that we can grow if needed
     int capacity = inputStrLen + 1;
     char *result = malloc(capacity);
@@ -1189,7 +1383,8 @@ WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int 
         return NULL;
     memcpy(result, input, inputStrLen + 1);
 
-    // Iterate through the input string to find line breaks or places to add new ones
+    // Iterate through the input string to find line breaks or places to add
+    // new ones
     for (int i = 0; i < inputStrLen; i++)
     {
         // Skip counting ANSI escape sequences
@@ -1202,15 +1397,38 @@ WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int 
             continue;
         }
 
-        // If a newline is already in the string, handle it and advance to next
-        // iteration
+        // If a newline is already in the string, handle it and advance to
+        // next iteration
         if (result[i] == '\n')
         {
             lines++;
             widthCount = 0;
             lastBreakPos = -1;
             lastBreakChar = '\0';
+            hasPrefix = 0;
+            prefixAtStart = (prefixLen == 0);
+            prefixAtIndent = (prefixLen == 0);
             continue;
+        }
+
+        // Test for prefix at the start of the line
+        if (!prefixAtStart && widthCount == 0)
+        {
+            prefixAtStart = 1;
+            if (prefixLen > 0 && i + prefixLen <= inputStrLen &&
+                strncmp(result + i, prefix, prefixLen) == 0)
+                hasPrefix = 1;
+        }
+        // Test for prefix after the indent
+        else if (!prefixAtIndent && indentLen > 0 &&
+            widthCount == indentLen)
+        {
+            prefixAtIndent = 1;
+            if (!hasPrefix && prefixLen > 0 && i + prefixLen <= inputStrLen
+                && strncmp(result + i, prefix, prefixLen) == 0)
+            {
+                hasPrefix = 1;
+            }
         }
 
         // If we have an indent, add some grace in case it's being used to
@@ -1272,15 +1490,19 @@ WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int 
                 }
 
                 lines++;
+                // Indent length taking into account the possible prefix
+                int actualIndentLen = indentLen +
+                    (hasPrefix ? prefixLen : 0);
 
-                // If indent is desired, time to add that to the start of the line
-                if (indent && indentLen > 0)
+                // If indent and/or prefix is desired, time to add that to
+                // the start of the line
+                if (actualIndentLen > 0)
                 {
-                    int needed2 = inputStrLen + indentLen + 1;
+                    int needed2 = inputStrLen + actualIndentLen + 1;
                     if (needed2 > capacity)
                     {
-                        // Make sure there is room for the extra length needed for
-                        // inserting an indent
+                        // Make sure there is room for the extra length
+                        // needed for inserting an indent
                         int newCapacity = capacity ? capacity * 2 : 16;
                         while (newCapacity < needed2)
                             newCapacity *= 2;
@@ -1295,11 +1517,16 @@ WORD_WRAPPED *wordWrap(char *input, int width, char *indent, int hardBreak, int 
                         capacity = newCapacity;
                     }
 
-                    memmove(result + breakPos + 1 + indentLen, result + breakPos + 1, inputStrLen - breakPos);
-                    memcpy(result + breakPos + 1, indent, indentLen);
-                    inputStrLen += indentLen;
+                    memmove(result + breakPos + 1 + actualIndentLen,
+                        result + breakPos + 1, inputStrLen - breakPos);
+                    if (indentLen > 0)
+                        memcpy(result + breakPos + 1, indent, indentLen);
+                    if (hasPrefix && prefixLen > 0)
+                        memset(result + breakPos + 1 + indentLen, ' ',
+                            prefixLen);
+                    inputStrLen += actualIndentLen;
                     if (breakPos <= i)
-                        i += indentLen;
+                        i += actualIndentLen;
                 }
 
                 widthCount = i - breakPos;
