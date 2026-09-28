@@ -55,6 +55,7 @@ Config CONFIG = {
 int ANY_PBR_LOADED = 0;
 char CONFONTS[MAX_FONTS][PATH_MAX] = {0};
 int CONFONTS_COUNT = 0;
+int EXIT_NO = 0;
 char KERNEL_VER[KERNEL_VER_LEN] = {0};
 char KEYMAPS[MAX_KEYMAPS][PATH_MAX] = {0};
 int KEYMAPS_COUNT = 0;
@@ -817,6 +818,7 @@ void saveFontCol(MenuItem itm)
     printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
     free(wrapped->str);
     free(wrapped);
+    EXIT_NO = 3;
 }
 
 /**
@@ -2353,8 +2355,9 @@ void showKeymapMenu(void)
 
 /**
  * Displays SHORKSET' main menu
+ * @returns 0 if exits normally; 3 if font colour changed
  */
-void showMainMenu(void)
+int showMainMenu(void)
 {
     setupMenuSys();
 
@@ -2495,6 +2498,7 @@ void showMainMenu(void)
     }
 
     clearScreen();
+    return EXIT_NO;
 }
 
 /**
