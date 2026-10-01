@@ -3,14 +3,18 @@ AR ?= ar
 RANLIB ?= ranlib
 STRIP ?= strip
 
-CFLAGS += -D_GNU_SOURCE -std=gnu99 -I. -Os
+ifeq ($(wildcard shorkcommon/.git),)
+$(shell git submodule update --init shorkcommon)
+endif
+
+CFLAGS += -D_GNU_SOURCE -std=gnu99 -I. -Ishorkcommon -Os
 LDFLAGS += -static
 
 ifdef FB
 	CFLAGS += -DFB
 endif
 
-SRC = src/*.c
+SRC = $(wildcard src/*.c) $(wildcard shorkcommon/*.c)
 
 shorkset: $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o shorkset $(LDFLAGS)

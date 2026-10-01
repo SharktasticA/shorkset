@@ -1,0 +1,3 @@
+[submodule "shorkcommon"]
+	path = shorkcommon
+	url = https://github.com/SharktasticA/shorkcommon
