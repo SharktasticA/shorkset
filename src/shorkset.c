@@ -38,6 +38,7 @@
 
 Config CONFIG = {
     3840,
+    1,
     "white",
     "0;37",
     "default",
@@ -322,6 +323,8 @@ void loadConf(void)
    
             if (strncmp(buffer, "DISP_RES=", 9) == 0)
                 CONFIG.dispRes = atoi(value);
+            else if (strncmp(buffer, "DYN_SWAP_ENABLED=", 17) == 0)
+                CONFIG.dynSwapEnabled = atoi(value);
             else if (strncmp(buffer, "FONT_COL_NAME=", 14) == 0)
                 snprintf(CONFIG.fontColName, CONFIG_FONT_COL_NAME_LEN, "%s", value);
             else if (strncmp(buffer, "FONT_COL_ANSI=", 14) == 0)
@@ -1194,7 +1197,6 @@ void showDriverCatsMenu(void)
                 break;
 
             case ENTER:
-                clearScreen();
                 menu[cursorY - 1].action();
                 break;
         
@@ -1359,6 +1361,92 @@ void showDriversListMenu(const char *cat)
 
     freeMenu(menu, menuSize);
     clearScreen();
+}
+
+void showDynamicSwapMenu(void)
+{
+    MenuItem menu[] = {
+        { "enb", "Enable", NULL, NULL, 1, 0 }
+    };
+    int menuSize = sizeof(menu) / sizeof(menu[0]);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    char msg[150] = "Dynamic swap creates swap files on the fly as known "
+        "memory-intensive programs are run, then deletes them after said "
+        "programs exit.";
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            if (CONFIG.dynSwapEnabled)
+            {
+                snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable");
+                markEntry(menu[0].name, COL_FOR_RED, 1);
+            }
+            else
+            {
+                snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable");
+                markEntry(menu[0].name, COL_FOR_GREEN, 1);
+            }
+
+            clearScreen();
+            printHeader("Dynamic swap");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Toggle [q] Quit");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY,  &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                CONFIG.dynSwapEnabled = !CONFIG.dynSwapEnabled;
+                writeConf();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            default:
+                fullRedraw = 0;
+                break;
+        }
+    }
 }
 
 /**
@@ -1764,7 +1852,7 @@ void showGpmMenu(void)
     MenuItem rawMenu[] = {
         {
             "eng",
-            "Enable gpm",
+            "Enable",
             NULL,
             NULL,
             1
@@ -1797,13 +1885,13 @@ void showGpmMenu(void)
     // Set enable/disable gpm item's default value
     if (CONFIG.gpmEnabled)
     {
-        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable gpm");
-        markEntry(menu[0].name, COL_FOR_GREEN, 1);
+        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable");
+        markEntry(menu[0].name, COL_FOR_RED, 1);
     }
     else
     {
-        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable gpm");
-        markEntry(menu[0].name, COL_FOR_RED, 1);
+        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable");
+        markEntry(menu[0].name, COL_FOR_GREEN, 1);
     }
 
     int running = 1;
@@ -2385,6 +2473,13 @@ int showMainMenu(void)
             showDriverCatsMenu,
             IS_NET_MODULES || IS_SND_MODULES
         },
+        { 
+            "swp",
+            "Dynamic swap",
+            "",
+            showDynamicSwapMenu,
+            1
+        },
         {
             "lay", 
             "Keyboard layout",
@@ -2476,7 +2571,6 @@ int showMainMenu(void)
                 break;
 
             case ENTER:
-                clearScreen();
                 menu[cursorY - 1].action();
                 fullRedraw = 1;
                 break;
@@ -2665,7 +2759,7 @@ void showNetManMenu(void)
 {
     MenuItem rawMenu[] = {
         {
-            "enb", "Enable networking", NULL, NULL, 1
+            "enb", "Enable", NULL, NULL, 1
         },
         {
             "aif", "Interfaces", NULL, showNetSelectIfs,
@@ -2687,18 +2781,6 @@ void showNetManMenu(void)
     int currMenuSize = realMenuSize;
     if (!CONFIG.netEnabled)
         currMenuSize = 1;
-
-    // Set enable/disable networking item's default value
-    if (CONFIG.netEnabled)
-    {
-        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable networking");
-        markEntry(menu[0].name, COL_FOR_GREEN, 1);
-    }
-    else
-    {
-        snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable networking");
-        markEntry(menu[0].name, COL_FOR_RED, 1);
-    }
 
     char msg[200] = {0};
     if (NET_IFS_NO == 0)
@@ -2722,9 +2804,17 @@ void showNetManMenu(void)
         {
             // Show/hide full menu depending on CONFIG.netEnabled
             if (CONFIG.netEnabled)
+            {
+                snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable");
+                markEntry(menu[0].name, COL_FOR_RED, 1);
                 currMenuSize = realMenuSize;
+            }
             else
+            {
+                snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable");
+                markEntry(menu[0].name, COL_FOR_GREEN, 1);
                 currMenuSize = 1;
+            }
 
             clearScreen();
             printHeader("Network");
@@ -2766,7 +2856,10 @@ void showNetManMenu(void)
 
             case ENTER:
                 if (cursorY == 1)
-                    toggleNetEnabled(menu[cursorY - 1].name);
+                {
+                    CONFIG.netEnabled = !CONFIG.netEnabled;
+                    writeConf();
+                }
                 else
                     menu[cursorY - 1].action();
                 fullRedraw = 1;
@@ -3153,29 +3246,6 @@ void toggleDriver(const ModuleEntry *mod)
 }
 
 /**
- * Toggles the value of CONFIG.netEnabled and writes it, then modifies the
- * toggling menu item to convey the new status.
- * @param name Name of the menu item that toggled this
- */
-void toggleNetEnabled(char *name)
-{
-    CONFIG.netEnabled = !CONFIG.netEnabled;
-    writeConf();
-    // TODO: confirmation screen?
-
-    if (CONFIG.netEnabled)
-    {
-        snprintf(name, MENU_ITEM_NAME_LEN, "Disable networking");
-        markEntry(name, COL_FOR_GREEN, 1);
-    }
-    else
-    {
-        snprintf(name, MENU_ITEM_NAME_LEN, "Enable networking");
-        markEntry(name, COL_FOR_RED, 1);
-    }
-}
-
-/**
  * Toggles the up (activated)/down (deactivated) status of the given network
  * interface to its opposite value.
  * @param id Network interface's menu item ID
@@ -3347,6 +3417,7 @@ void writeConf(void)
     }
 
     fprintf(stream, "DISP_RES=%d\n", CONFIG.dispRes);
+    fprintf(stream, "DYN_SWAP_ENABLED=%d\n", CONFIG.dynSwapEnabled);
     fprintf(stream, "FONT_COL_NAME=\"%s\"\n", CONFIG.fontColName);
     fprintf(stream, "FONT_COL_ANSI=\"%s\"\n", CONFIG.fontColANSI);
     fprintf(stream, "FONT_PSF=\"%s\"\n", CONFIG.fontPSF);

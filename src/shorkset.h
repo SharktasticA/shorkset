@@ -49,6 +49,9 @@
 typedef struct {
     // Display resolution code (default: 3840)
     int dispRes;
+    // Dynamic swap enabled (default: 1)
+    int dynSwapEnabled;
+    // gpm responsiveness
     // Font colour name (default: "white")
     char fontColName[CONFIG_FONT_COL_NAME_LEN];
     // Font colour ANSI escape code (default: "0;37")
@@ -156,6 +159,7 @@ void seedPCMCIASockets(void);
 void showDispResMenu(void);
 void showDriverCatsMenu(void);
 void showDriversListMenu(const char*);
+void showDynamicSwapMenu(void);
 void showFontColMenu(void);
 void showFontMenu(void);
 void showFontPSFMenu(void);
@@ -174,7 +178,6 @@ void showPBrDriversMenu(void);
 void showSndDriversMenu(void);
 void showVolumeMenu(void);
 void toggleDriver(const ModuleEntry*);
-void toggleNetEnabled(char*);
 void toggleNetIf(const char*);
 void writeConf(void);
 
