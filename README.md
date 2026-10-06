@@ -7,16 +7,17 @@ A settings program for SHORK Operating Systems such as [SHORK 486](https://githu
   * Network interfaces
   * PCMCIA bridges
   * Sound cards
+* Dynamic swap
 * Keyboard layout (keymaps)
 * Font
   * Colour
   * Style (PSF)
 * Mouse
   * General purpose mouse (gpm)
-    * Enable/disable gpm
+    * Enable/disable
     * Mouse type
     * Responsiveness
-* Networking
-  * Enable/disable networking
+* Network
+  * Enable/disable
   * Interfaces
 * Volume
