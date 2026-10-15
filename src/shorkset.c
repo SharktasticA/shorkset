@@ -2471,7 +2471,7 @@ int showMainMenu(void)
             "Drivers",
             "",
             showDriverCatsMenu,
-            IS_NET_MODULES || IS_SND_MODULES
+            IS_NET_MODULES || IS_PBR_MODULES || IS_SND_MODULES
         },
         { 
             "swp",
