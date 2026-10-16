@@ -50,6 +50,7 @@ Config CONFIG = {
     "",
     0,
     "",
+    1,
     40
 };
 
@@ -347,6 +348,8 @@ void loadConf(void)
                 CONFIG.netEnabled = atoi(value);
             else if (strncmp(buffer, "NET_IFS=", 8) == 0)
                 snprintf(CONFIG.netIfs, CONFIG_NET_IFS_LEN, "%s", value);
+            else if (strncmp(buffer, "SPLASH_ENABLED=", 15) == 0)
+                CONFIG.splashEnabled = atoi(value);
             else if (strncmp(buffer, "VOLUME=", 7) == 0)
                 CONFIG.volume = atoi(value);
         }
@@ -3429,6 +3432,7 @@ void writeConf(void)
     fprintf(stream, "MODULES=\"%s\"\n", CONFIG.modules);
     fprintf(stream, "NET_ENABLED=%d\n", CONFIG.netEnabled);
     fprintf(stream, "NET_IFS=\"%s\"\n", CONFIG.netIfs);
+    fprintf(stream, "SPLASH_ENABLED=%d\n", CONFIG.splashEnabled);
     fprintf(stream, "VOLUME=%d\n", CONFIG.volume);
     fclose(stream);
     sync();

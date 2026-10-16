@@ -74,6 +74,8 @@ typedef struct {
     int netEnabled;
     // Network interfaces to activate at system startup
     char netIfs[CONFIG_NET_IFS_LEN];
+    // Splash screen enabled (default: 1)
+    int splashEnabled;
     // System volume (default: 40)
     int volume;
 } Config;
