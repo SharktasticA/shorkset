@@ -20,4 +20,9 @@ A settings program for SHORK Operating Systems such as [SHORK 486](https://githu
 * Network
   * Enable/disable
   * Interfaces
+* Splash screen
+  * Enable/disable
+  * Splash only
+  * Splash with log messages
+  * Splash with progress bar
 * Volume

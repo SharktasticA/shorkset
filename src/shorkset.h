@@ -21,6 +21,7 @@
 
 
 
+#define BANNER_PATH                 "/banners/welcome"
 #define CSV_BUFFER                  16384
 #define CONFIG_FONT_COL_NAME_LEN    32
 #define CONFIG_FONT_COL_ANSI_LEN    32
@@ -43,6 +44,16 @@
 #define MODULES_DIR                 "/lib/modules"
 #define NET_IF_NAME_LEN             32
 #define UDHCPC_DEFAULT_SCRIPT       "/usr/share/udhcpc/default.script"
+
+
+
+typedef enum
+{
+    SPLASH_OFF = 0,
+    SPLASH_ONLY = 1,
+    SPLASH_LOG = 2,
+    SPLASH_PROG = 3
+} SPLASH_TYPE;
 
 
 
@@ -74,8 +85,8 @@ typedef struct {
     int netEnabled;
     // Network interfaces to activate at system startup
     char netIfs[CONFIG_NET_IFS_LEN];
-    // Splash screen enabled (default: 1)
-    int splashEnabled;
+    // Splash screen type (default: SPLASH_PROG)
+    SPLASH_TYPE splashType;
     // System volume (default: 40)
     int volume;
 } Config;
@@ -178,6 +189,7 @@ void showNetManMenu(void);
 void showNetSelectIfs(void);
 void showPBrDriversMenu(void);
 void showSndDriversMenu(void);
+void showSplashScreenMenu(void);
 void showVolumeMenu(void);
 void toggleDriver(const ModuleEntry*);
 void toggleNetIf(const char*);

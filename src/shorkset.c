@@ -50,7 +50,7 @@ Config CONFIG = {
     "",
     0,
     "",
-    1,
+    SPLASH_PROG,
     40
 };
 
@@ -348,8 +348,8 @@ void loadConf(void)
                 CONFIG.netEnabled = atoi(value);
             else if (strncmp(buffer, "NET_IFS=", 8) == 0)
                 snprintf(CONFIG.netIfs, CONFIG_NET_IFS_LEN, "%s", value);
-            else if (strncmp(buffer, "SPLASH_ENABLED=", 15) == 0)
-                CONFIG.splashEnabled = atoi(value);
+            else if (strncmp(buffer, "SPLASH_TYPE=", 12) == 0)
+                CONFIG.splashType = atoi(value);
             else if (strncmp(buffer, "VOLUME=", 7) == 0)
                 CONFIG.volume = atoi(value);
         }
@@ -2512,6 +2512,13 @@ int showMainMenu(void)
             isProgramInstalled("ifconfig", 1)
         },
         {
+            "splash",
+            "Splash screen",
+            "",
+            showSplashScreenMenu,
+            fileExists(BANNER_PATH)
+        },
+        {
             "vol",
             "Volume",
             "",
@@ -2623,9 +2630,12 @@ void showModuleDevices(const char *id, const char *name)
         }
     }
 
+    char *nameClean = strdup(name);
+    unmarkEntry(nameClean);
     char msgTitle[MENU_ITEM_NAME_LEN];
     snprintf(msgTitle, MENU_ITEM_NAME_LEN, "Devices compatible with %s",
-        name);
+        nameClean);
+    free(nameClean);
 
     if (foundDevs)
     {
@@ -2883,8 +2893,6 @@ void showNetManMenu(void)
                 break;
         }
     }
-
-    clearScreen();
 }
 
 /**
@@ -3015,6 +3023,146 @@ void showSndDriversMenu(void)
     showDriversListMenu("snd");
 }
 
+void showSplashScreenMenu(void)
+{
+    MenuItem rawMenu[] = {
+        {
+            "enb", "Enable", NULL, NULL, 1
+        },
+        {
+            "off", "Splash only", NULL, NULL, CONFIG.splashType > 0
+        },
+        {
+            "log", "Splash with log messages", NULL, NULL,
+            CONFIG.splashType > 0
+        },
+        {
+            "prog", "Splash with progress bar", NULL, NULL,
+            CONFIG.splashType > 0
+        }
+    };
+    int rawMenuSize = sizeof(rawMenu) / sizeof(rawMenu[0]);
+
+    // Filter menu to just what should actually be visible
+    MenuItem menu[rawMenuSize];
+    int realMenuSize = 0;
+    for (int i = 0; i < rawMenuSize; i++)
+        if (rawMenu[i].isVisible)
+            menu[realMenuSize++] = rawMenu[i];
+    freeMenu(rawMenu, rawMenuSize);
+
+    char msg[200] = "The splash screen consists of the SHORK logo, the OS "
+        "name, the author, and optionally some progress tracking. When "
+        "enabled, it is shown during SHORK's init stage.";
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    // The menu size used in the menu loop that can be =1 if splash is
+    // disabled
+    int currMenuSize = realMenuSize;
+    if (CONFIG.splashType == 0)
+        currMenuSize = 1;
+    else
+        cursorY = CONFIG.splashType + 1;
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            // Show/hide full menu depending on CONFIG.splashType
+            if (CONFIG.splashType > 0)
+            {
+                snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Disable");
+                markEntry(menu[0].name, COL_FOR_RED, 1);
+                currMenuSize = realMenuSize;
+
+                // Mark/unmark the options
+                for (int i = 0; i < currMenuSize; i++)
+                {
+                    if (i == CONFIG.splashType)
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
+                    else
+                        unmarkEntry(menu[i].name);
+                }
+            }
+            else
+            {
+                snprintf(menu[0].name, MENU_ITEM_NAME_LEN, "Enable");
+                markEntry(menu[0].name, COL_FOR_GREEN, 1);
+                currMenuSize = 1;
+            }
+
+            clearScreen();
+            printHeader("Splash screen");
+            printMenu(menu, currMenuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                currMenuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, currMenuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                currMenuSize, &cursorX, &cursorY, &cursorXPrev,
+                &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = currMenuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > currMenuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                if (cursorY == 1 && CONFIG.splashType > 0)
+                    CONFIG.splashType = SPLASH_OFF;
+                else if (cursorY == 1 && CONFIG.splashType == 0)
+                    CONFIG.splashType = SPLASH_ONLY;
+                else
+                    CONFIG.splashType = cursorY - 1;
+                writeConf();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
+                break;
+        }
+    }
+}
+
 /**
  * Displays System volume selection menu
  */
@@ -3120,8 +3268,6 @@ void showVolumeMenu(void)
                 break;
         }
     }
-
-    clearScreen();
 }
 
 /**
@@ -3432,7 +3578,7 @@ void writeConf(void)
     fprintf(stream, "MODULES=\"%s\"\n", CONFIG.modules);
     fprintf(stream, "NET_ENABLED=%d\n", CONFIG.netEnabled);
     fprintf(stream, "NET_IFS=\"%s\"\n", CONFIG.netIfs);
-    fprintf(stream, "SPLASH_ENABLED=%d\n", CONFIG.splashEnabled);
+    fprintf(stream, "SPLASH_TYPE=%d\n", CONFIG.splashType);
     fprintf(stream, "VOLUME=%d\n", CONFIG.volume);
     fclose(stream);
     sync();
