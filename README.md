@@ -4,6 +4,7 @@ A settings program for SHORK Operating Systems such as [SHORK 486](https://githu
 
 * Display resolution
 * Drivers
+  * Framebuffers
   * Network interfaces
   * PCMCIA bridges
   * Sound cards

@@ -64,6 +64,8 @@ int KEYMAPS_COUNT = 0;
 int IS_NET_MODULES = 0;
 int IS_PBR_MODULES = 0;
 int IS_SND_MODULES = 0;
+int IS_VESAFB = 0;
+int IS_VGA16FB = 0;
 ModuleDevice MODULE_DEVS[MAX_MODULE_DEVS_ENTRIES] = {0};
 ModuleEntry MODULES[MAX_MODULES_ENTRIES] = {0};
 int MODULE_DEVS_NO = 0;
@@ -170,7 +172,8 @@ void getCurrRes(void)
     // If no cfg found, time to exit...
     if (!cfg)
     {
-        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file was found");
+        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file "
+            "was found");
         exit(1);
     }
 
@@ -178,7 +181,8 @@ void getCurrRes(void)
     FILE *stream = fopen(cfg, "r");
     if (!stream)
     {
-        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration file");
+        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration "
+            "file");
         exit(1);
     }
 
@@ -204,9 +208,29 @@ void getCurrRes(void)
     // Catch if unsuccessful
     if (CONFIG.dispRes == -1)
     {
-        EXIT_MSG = strdup("ERROR: unable to determine the current resolution from bootloader configuration file");
+        EXIT_MSG = strdup("ERROR: unable to determine the current "
+            "resolution from bootloader configuration file");
         exit(1);
     }
+}
+
+/**
+ * Looks for framebuffer drivers to set IS_VESAFB and IS_VGA16FB.
+ * @return 1 if either IS_VESAFB or IS_VGA16FB =1; 0 if both =0
+ */
+int getFBDrivers(void)
+{
+    struct stat st;
+
+    IS_VESAFB = (
+        stat("/sys/bus/platform/drivers/vesa-framebuffer", &st) == 0 &&
+        S_ISDIR(st.st_mode)) ? 1 : 0;
+
+    IS_VGA16FB = (
+        stat("/sys/bus/platform/drivers/vga16fb", &st) == 0 &&
+        S_ISDIR(st.st_mode)) ? 1 : 0;
+
+    return IS_VESAFB || IS_VGA16FB;
 }
 
 /**
@@ -293,6 +317,59 @@ ModuleEntry *getModuleFromName(const char *name)
         if (strcmp(name, MODULES[i].name) == 0)
             return &MODULES[i];
     return NULL;
+}
+
+/**
+ * Gets if the "vga16fb.force" is used in the bootloader config file.
+ * @return 1 if found; 0 if not
+ */
+int getVGAFB16ForcePresent(void)
+{
+    // Find and select a bootloader cfg file
+    const char *cfg = NULL;
+    for (int i = 0; i < CFG_PATHS_LEN; i++)
+    {
+        if (access(CFG_PATHS[i], F_OK) == 0)
+        {
+            cfg = CFG_PATHS[i];
+            break;
+        }
+    }
+
+    // If no cfg found, time to exit...
+    if (!cfg)
+    {
+        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file "
+            "was found");
+        exit(1);
+    }
+
+    // Open stream to cfg
+    FILE *stream = fopen(cfg, "r");
+    if (!stream)
+    {
+        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration "
+            "file");
+        exit(1);
+    }
+
+
+    // Finds the "vga16fb.force" parameter
+    int forcePresent = 0;
+    char *line = NULL;
+    size_t cap = 0;
+    while (getline(&line, &cap, stream) != -1)
+    {
+        if (strstr(line, "vga16fb.force") != NULL)
+        {
+            forcePresent = 1;
+            break;
+        }
+    }
+    free(line);
+    fclose(stream);
+
+    return forcePresent;
 }
 
 /**
@@ -701,6 +778,15 @@ int loadNetIfs(void)
  */
 void saveDispRes(MenuItem itm, int skipMsg)
 {
+    if (!skipMsg && strcmp(CONFIG.fontPSF, "default") != 0 &&
+        CONFIG.dispRes >= 3840 && !printYesNoScreen(
+            itm.name,
+            "You have previously selected a PSF font, which has its own "
+                "text mode. If you continue selecting this text mode "
+                "resolution, it will override your chosen font. Do you "
+                "wish to continue?"))
+        return;
+    
     // Find and select a bootloader cfg file
     const char *cfg = NULL;
     for (int i = 0; i < CFG_PATHS_LEN; i++)
@@ -715,7 +801,8 @@ void saveDispRes(MenuItem itm, int skipMsg)
     // If no cfg found, time to exit...
     if (!cfg)
     {
-        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file was found");
+        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file"
+            "was found");
         exit(1);
     }
 
@@ -723,7 +810,8 @@ void saveDispRes(MenuItem itm, int skipMsg)
     FILE *stream = fopen(cfg, "r");
     if (!stream)
     {
-        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration file");
+        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration "
+            "file");
         exit(1);
     }
 
@@ -769,7 +857,8 @@ void saveDispRes(MenuItem itm, int skipMsg)
     stream = fopen(cfg, "w");
     if (!stream)
     {
-        EXIT_MSG = strdup("ERROR: failed to write bootloader configuration file");
+        EXIT_MSG = strdup("ERROR: failed to write bootloader configuration "
+            "file");
         free(result);
         exit(1);
     }
@@ -778,25 +867,21 @@ void saveDispRes(MenuItem itm, int skipMsg)
     fclose(stream);
     free(result);
     CONFIG.dispRes = atoi(itm.id);
-    // If a VGA resolution was selected, we also have to reset the PSF font to
-    // "default" since they normally dictate their own VGA resolution
+    // If a text mode was selected, we also have to reset the PSF font to
+    // "default" since they normally dictate their own mode
     if (!skipMsg && CONFIG.dispRes >= 3840)
         snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "default");
     writeConf();
 
     if (!skipMsg)
     {
-        char msgTitle[MENU_ITEM_NAME_LEN];
-        snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
-        char msgBody[320] = "The selected display resolution has been "
-            "saved. If you selected a VGA resolution and had selected a "
-            "PSF font before, the latter setting will now be discarded as "
-            "PSF fonts dictate their own VGA resolution. A system restart "
-            "is required before the changes will take effect.";
+        char msgBody[160] = "The selected display resolution has been "
+            "saved. A system restart is required before the changes will "
+            "take effect.";
 
         WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
             NULL, 0, 0);
-        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        printTextScreen(itm.name, wrapped->str, wrapped->lines, 1);
         free(wrapped->str);
         free(wrapped);
     }
@@ -839,7 +924,10 @@ void saveFontPSF(MenuItem itm)
         writeConf();
         
         char msgTitle[MENU_ITEM_NAME_LEN] = "default";
-        char msgBody[320] = "The PSF font will be reset to default. If a PSF font other than \"default\" was previously selected, you must restart your computer before this change will take effect.";
+        char msgBody[320] = "The PSF font will be reset to default. If a "
+            "PSF font other than \"default\" was previously selected, you "
+            "must restart your computer before this change will take "
+            "effect.";
 
         WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
             NULL, 0, 0);
@@ -855,24 +943,14 @@ void saveFontPSF(MenuItem itm)
         setupViewport();
 
         snprintf(CONFIG.fontPSF, sizeof(CONFIG.fontPSF), "%s", itm.payload);
-        // If VGA font, we need to reset to default since PSF fonts override VGA
-        // resolutions
+        // If currently a text mode resolution, we need to reset to default
+        // since PSF fonts override text modes
         if (CONFIG.dispRes >= 3840)
             saveDispRes((MenuItem){ "3840", "", "", NULL, 1 }, 1);
-        // saveDispRes will call writeConf anyway, only needed if not resetting
-        // display resolution
+        // saveDispRes will call writeConf anyway, only needed if not
+        // resetting display resolution
         else
             writeConf();
-
-        char msgTitle[MENU_ITEM_NAME_LEN];
-        snprintf(msgTitle, MENU_ITEM_NAME_LEN, "%s", itm.name);
-        char msgBody[320] = "The selected PSF font has been saved and will be applied once you exit SHORKSET. If you had selected a VGA display resolution before, that setting will now be discarded as the PSF font will dictate its own VGA resolution. VBE display resolutions are unaffected.";
-
-        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
-            NULL, 0, 0);
-        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
-        free(wrapped->str);
-        free(wrapped);
     }
 }
 
@@ -981,8 +1059,24 @@ void seedPCMCIASockets(void)
  */
 void showDispResMenu(void)
 {
+    if (getVGAFB16ForcePresent())
+    {
+        char msgTitle[32] = "Select display resolution";
+        char msgBody[250] = "The force vga16fb mode is currently enabled, "
+            "which overrides any text or VESA mode you may select. Please "
+            "disable that mode in \"Drivers\" -> \"Framebuffers\" before "
+            "continuing.";
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col,
+            NULL, NULL, 0, 0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
+        return;
+    }
+
     MenuItem rawMenu[] = {
-        { "",       "VGA modes (col x row)", NULL, NULL, 1, 1 },
+        { "",       "Text modes (col x row)", NULL, NULL, 1, 1 },
         { "3840",   "80x25", NULL, NULL, 1, 0 },
         { "3843",   "80x28", NULL, NULL, 1, 0 },
         { "3846",   "80x34", NULL, NULL, 1, 0 },
@@ -1059,7 +1153,8 @@ void showDispResMenu(void)
         {
             clearScreen();
             printHeader("Select display resolution");
-            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[jk] Navigate [Enter] Select [q] Back");
         }
         else
@@ -1068,7 +1163,8 @@ void showDispResMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6, menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
@@ -1129,6 +1225,10 @@ void showDispResMenu(void)
 void showDriverCatsMenu(void)
 {
     MenuItem rawMenu[] = {
+        {
+            "fb", "Framebuffers", NULL, showFBDriversMenu,
+            IS_VESAFB && IS_VGA16FB
+        },
         {
             "net", "Network interface", NULL, showNetDriversMenu,
             IS_NET_MODULES, 0
@@ -1452,6 +1552,91 @@ void showDynamicSwapMenu(void)
     }
 }
 
+void showFBDriversMenu(void)
+{
+    MenuItem menu[] = {
+        { "", "Force vga16fb mode", NULL, NULL, 1, 1 },
+        { "", "Enable", NULL, NULL, 1, 0 }
+    };
+    int menuSize = sizeof(menu) / sizeof(menu[0]);
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    char msg[100] = "This system's kernel has the vesafb and vga16fb "
+        "framebuffer drivers built in.";
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            if (getVGAFB16ForcePresent())
+            {
+                snprintf(menu[1].name, MENU_ITEM_NAME_LEN, "Disable");
+                markEntry(menu[1].name, COL_FOR_RED, 1);
+            }
+            else
+            {
+                snprintf(menu[1].name, MENU_ITEM_NAME_LEN, "Enable");
+                markEntry(menu[1].name, COL_FOR_GREEN, 1);
+            }
+
+            clearScreen();
+            printHeader("Framebuffers");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Toggle [q] Quit");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, msg, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY,  &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                toggleVGAFB16Force();
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            default:
+                fullRedraw = 0;
+                break;
+        }
+    }
+}
+
 /**
  * Displays font colour selection menu
  */
@@ -1682,6 +1867,14 @@ void showFontMenu(void)
  */
 void showFontPSFMenu(void)
 {
+    if (CONFIG.dispRes > 3840 && !printYesNoScreen(
+        "Select font style (PSF)",
+        "You have previously selected a text mode resolution, yet PSF "
+            "fonts set their own text mode. If you continue and select a "
+            "font here, it will override your chosen mode. Do you wish to "
+            "continue?"))
+        return;
+
     MenuItem menu[MAX_FONTS + 1];
     menu[0] = (MenuItem){ "default", "Default", "default", NULL, 1 };
     int menuSize = 1;
@@ -1750,7 +1943,8 @@ void showFontPSFMenu(void)
         {
             clearScreen();
             printHeader("Select font style (PSF)");
-            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX,
+                &cursorY, &cursorXPrev, &cursorYPrev);
             printFooter("[hjkl] Navigate [Enter] Select [q] Back");
         }
         else
@@ -1759,7 +1953,8 @@ void showFontPSFMenu(void)
                 printf("\x1b[2;1H");
             else
                 printf("\x1b[3;1H");
-            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printMenu(menu, menuSize, NULL, cols, colWidth, rows, &cursorX,
+                &cursorY, &cursorXPrev, &cursorYPrev);
         }
 
         NavInput input = getNavInput();
@@ -2474,7 +2669,8 @@ int showMainMenu(void)
             "Drivers",
             "",
             showDriverCatsMenu,
-            IS_NET_MODULES || IS_PBR_MODULES || IS_SND_MODULES
+            getFBDrivers() || IS_NET_MODULES || IS_PBR_MODULES ||
+            IS_SND_MODULES
         },
         { 
             "swp",
@@ -3549,6 +3745,165 @@ void toggleNetIf(const char *id)
     else
         csvRemove(CONFIG.netIfs, id);
     writeConf();
+}
+
+/**
+ * @brief 
+ * 
+ */
+void toggleVGAFB16Force(void)
+{
+    int enabling = !getVGAFB16ForcePresent();
+
+    if (enabling && !printYesNoScreen(
+        "Force vga16fb mode",
+        "By enabling this mode, the vga16fb driver will be forced to bind "
+            "when a compatible display card is found. It should only be "
+            "used if you know you have EGA- or VGA-compatible hardware. "
+            "This will ignore your selected text mode or VESA resolution, "
+            "and the \"display resolution\" menu will be disabled until "
+            "you disable this mode. Do you wish to continue?"))
+        return;
+
+    // Find and select a bootloader cfg file
+    const char *cfg = NULL;
+    for (int i = 0; i < CFG_PATHS_LEN; i++)
+    {
+        if (access(CFG_PATHS[i], F_OK) == 0)
+        {
+            cfg = CFG_PATHS[i];
+            break;
+        }
+    }
+
+    // If no cfg found, time to exit...
+    if (!cfg)
+    {
+        EXIT_MSG = strdup("ERROR: no valid bootloader configuration file "
+            "was found");
+        exit(1);
+    }
+
+    // Open stream to cfg
+    FILE *stream = fopen(cfg, "r");
+    if (!stream)
+    {
+        EXIT_MSG = strdup("ERROR: failed to open bootloader configuration "
+            "file");
+        exit(1);
+    }
+
+    // Get cfg's contents length
+    fseek(stream, 0, SEEK_END);
+    size_t size = ftell(stream);
+    rewind(stream);
+
+    // Read cfg into buffer
+    char *buffer = malloc(size + 1);
+    fread(buffer, 1, size, stream);
+    buffer[size] = '\0';
+    fclose(stream);
+
+    // Remove any existing vga16fb.force* and the space after it
+    char *needle;
+    while ((needle = strstr(buffer, "vga16fb.force")) != NULL)
+    {
+        char *end = needle;
+        while (*end && *end != ' ' && *end != '\n')
+            end++;
+        if (*end == ' ')
+            end++;
+        memmove(needle, end, strlen(end) + 1);
+    }
+    size = strlen(buffer);
+
+    // Ensure vga param is in the buffer
+    char *vgaNeedle = strstr(buffer, "vga=");
+    if (!vgaNeedle)
+    {
+        EXIT_MSG = strdup("ERROR: bootloader configuration missing the "
+            "\"vga\" kernel parameter");
+        free(buffer);
+        exit(1);
+    }
+
+    char *result;
+    size_t patchedSize;
+    if (enabling)
+    {
+        // Ensure vga param is in the buffer
+        char *vgaNeedle = strstr(buffer, "vga=");
+        if (!vgaNeedle)
+        {
+            EXIT_MSG = strdup("ERROR: bootloader configuration missing the "
+                "\"vga\" kernel parameter");
+            free(buffer);
+            exit(1);
+        }
+
+        // Assemble the patch and result string
+        const char *forceArg = "vga16fb.force=1 ";
+        int forceArgLen = strlen(forceArg);
+        patchedSize = size + forceArgLen;
+        result = malloc(patchedSize + 1);
+        size_t prefix = vgaNeedle - buffer;
+
+        // Make the patch
+        memcpy(result, buffer, prefix);
+        memcpy(result + prefix, forceArg, forceArgLen);
+        strcpy(result + prefix + forceArgLen, vgaNeedle);
+        free(buffer);
+    }
+    else
+    {
+        // Nothing to add...
+        result = buffer;
+        patchedSize = size;
+    }
+
+    // Save the new cfg
+    stream = fopen(cfg, "w");
+    if (!stream)
+    {
+        EXIT_MSG = strdup("ERROR: failed to write bootloader configuration "
+            "file");
+        free(result);
+        exit(1);
+    }
+    fwrite(result, 1, patchedSize, stream);
+    fclose(stream);
+    free(result);
+    sync();
+
+    if (enabling)
+    {
+        char msgTitle[32] = "Force vga16fb mode";
+        char msgBody[130] = "The force vga16fb mode has been enabled. A "
+            "system restart is required before the changes will take "
+            "effect.";
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
+            NULL, 0, 0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
+
+        saveDispRes((MenuItem){ "3840", "", "", NULL, 1 }, 1);
+        writeConf();
+    }
+    else
+    {
+        char msgTitle[32] = "Force vga16fb mode";
+        char msgBody[130] = "The force vga16fb mode has been disabled. A "
+            "system restart is required before the changes will take "
+            "effect.";
+
+        WORD_WRAPPED *wrapped = wordWrap(msgBody, TERM_SIZE.ws_col, NULL,
+            NULL, 0, 0);
+        printTextScreen(msgTitle, wrapped->str, wrapped->lines, 1);
+        free(wrapped->str);
+        free(wrapped);
+    }
 }
 
 /**

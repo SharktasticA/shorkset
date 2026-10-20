@@ -131,6 +131,8 @@ extern int KEYMAPS_COUNT;
 extern int IS_NET_MODULES;
 extern int IS_PBR_MODULES;
 extern int IS_SND_MODULES;
+extern int IS_VESAFB;
+extern int IS_VGA16FB;
 extern ModuleDevice MODULE_DEVS[MAX_MODULE_DEVS_ENTRIES];
 extern ModuleEntry MODULES[MAX_MODULES_ENTRIES];
 extern int MODULE_DEVS_NO;
@@ -152,27 +154,35 @@ static const int PCMCIA_BRIDGES_LEN = sizeof(PCMCIA_BRIDGES) /
 void applyFontColFiles(char*);
 void applyFontColTtys(char*);
 void applyVolume(int);
+
 void getCurrRes(void);
+int getFBDrivers(void);
 int getHWVolume(int);
 void getKernelVer(void);
 LoadedModules getLoadedModules(void);
 ModuleEntry *getModuleFromName(const char*);
+int getVGAFB16ForcePresent(void);
+
 void loadConf(void);
 int loadConFonts(void);
 int loadKeymaps(void);
 int loadModuleDevices(void);
 int loadModules(void);
 int loadNetIfs(void);
+
 void saveDispRes(MenuItem, int);
 void saveFontCol(MenuItem);
 void saveFontPSF(MenuItem);
 void saveKeymap(MenuItem);
 void saveVolume(MenuItem);
+
 void seedPCMCIASockets(void);
+
 void showDispResMenu(void);
 void showDriverCatsMenu(void);
 void showDriversListMenu(const char*);
 void showDynamicSwapMenu(void);
+void showFBDriversMenu(void);
 void showFontColMenu(void);
 void showFontMenu(void);
 void showFontPSFMenu(void);
@@ -191,8 +201,11 @@ void showPBrDriversMenu(void);
 void showSndDriversMenu(void);
 void showSplashScreenMenu(void);
 void showVolumeMenu(void);
+
 void toggleDriver(const ModuleEntry*);
 void toggleNetIf(const char*);
+void toggleVGAFB16Force(void);
+
 void writeConf(void);
 
 #endif
