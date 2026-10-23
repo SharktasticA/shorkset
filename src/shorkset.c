@@ -2045,6 +2045,133 @@ void showFontPSFMenu(void)
     clearScreen();
 }
 
+/**
+ * Displays gpm mouse device selection menu
+ */
+void showGpmDevMenu(void)
+{
+    const int menuSize = 5;
+    MenuItem menu[menuSize];
+    int menuCount = 0;
+
+    for (int i = -1; i <= 3 && menuCount < menuSize; i++)
+    {
+        char path[MENU_ITEM_ID_LEN];
+        if (i < 0)
+            snprintf(path, sizeof(path), "/dev/input/mice");
+        else
+            snprintf(path, sizeof(path), "/dev/ttyS%d", i);
+        if (access(path, F_OK) != 0)
+            continue;
+
+        snprintf(menu[menuCount].id, MENU_ITEM_ID_LEN, "%s", path);
+        if (i < 0)
+            snprintf(menu[menuCount].name, MENU_ITEM_NAME_LEN, "%s (PS/2 aggregate)", path);
+        else
+            snprintf(menu[menuCount].name, MENU_ITEM_NAME_LEN, "%s (serial port)", path);
+        menu[menuCount].payload = NULL;
+        menu[menuCount].action = NULL;
+        menu[menuCount].isVisible = 1;
+        menu[menuCount].isStatic = 0;
+        menuCount++;
+    }
+
+    int running = 1;
+    int cursorX = 1;
+    int cursorY = 1;
+    int cursorXPrev = 1;
+    int cursorYPrev = 0;
+    int fullRedraw = 1;
+
+    // Mark the current device
+    for (int i = 0; i < menuSize; i++)
+    {
+        if (strcmp(menu[i].id, CONFIG.gpmDev) == 0)
+        {
+            markEntry(menu[i].name, COL_FOR_GREEN, 0);
+            cursorY = i + 1;
+            break;
+        }
+    }
+
+    while (running)
+    {
+        if (fullRedraw)
+        {
+            clearScreen();
+            printHeader("Select mouse device");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+            printFooter("[jk] Navigate [Enter] Select [q] Back");
+        }
+        else
+        {
+            if (COL_ENABLED)
+                printf("\x1b[2;1H");
+            else
+                printf("\x1b[3;1H");
+            printMenu(menu, menuSize, NULL, 1, TERM_SIZE.ws_col - 6,
+                menuSize, &cursorX, &cursorY, &cursorXPrev, &cursorYPrev);
+        }
+
+        NavInput input = getNavInput();
+
+        fullRedraw = 1;
+        cursorYPrev = 0;
+        switch (input)
+        {
+            case CURSOR_UP:
+                cursorYPrev = cursorY;
+                cursorY--;
+                if (cursorY < 1) cursorY = menuSize;
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_DOWN:
+                cursorYPrev = cursorY;
+                cursorY++;
+                if (cursorY > menuSize) cursorY = 1;
+                fullRedraw = 0;
+                break;
+
+            case ENTER:
+                snprintf(CONFIG.gpmDev, PATH_MAX, "%s",
+                    menu[cursorY - 1].id);
+                writeConf();
+                // Apply new gpm settings immediately
+                killProc("gpm");
+                char respStr[12];
+                snprintf(respStr, 12, "%d", CONFIG.gpmResp);
+                runCmd("gpm", "-m", CONFIG.gpmDev, "-r", respStr, "-t",
+                    CONFIG.gpmType, NULL);
+                // Update marked item
+                for (int i = 0; i < menuSize; i++)
+                {
+                    if (strcmp(menu[i].id, CONFIG.gpmDev) == 0)
+                        markEntry(menu[i].name, COL_FOR_GREEN, 0);
+                    else
+                        unmarkEntry(menu[i].name);
+                }
+                fullRedraw = 1;
+                break;
+
+            case QUIT:
+                running = 0;
+                break;
+
+            case INVALID:
+                fullRedraw = 0;
+                break;
+
+            case CURSOR_LEFT:
+            case CURSOR_RIGHT:
+            case INSPECT:
+                fullRedraw = 0;
+                break;
+        }
+    }
+}
+
 void showGpmMenu(void)
 {
     MenuItem rawMenu[] = {
@@ -2054,6 +2181,13 @@ void showGpmMenu(void)
             NULL,
             NULL,
             1
+        },
+        {
+            "dev",
+            "Mouse device",
+            NULL,
+            showGpmDevMenu,
+            CONFIG.gpmEnabled
         },
         {
             "type",
@@ -2178,8 +2312,6 @@ void showGpmMenu(void)
                 break;
         }
     }
-
-    clearScreen();
 }
 
 /**
@@ -2294,8 +2426,6 @@ void showGpmRespMenu(void)
                 break;
         }
     }
-
-    clearScreen();
 }
 
 /**
@@ -2429,8 +2559,6 @@ void showGpmTypeMenu(void)
                 break;
         }
     }
-
-    clearScreen();
 }
 
 void showHelp(void)

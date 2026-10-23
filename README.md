@@ -16,6 +16,7 @@ A settings program for SHORK Operating Systems such as [SHORK 486](https://githu
 * Mouse
   * General purpose mouse (gpm)
     * Enable/disable
+    * Mouse device
     * Mouse type
     * Responsiveness
 * Network

@@ -186,6 +186,7 @@ void showFBDriversMenu(void);
 void showFontColMenu(void);
 void showFontMenu(void);
 void showFontPSFMenu(void);
+void showGpmDevMenu(void);
 void showGpmMenu(void);
 void showGpmRespMenu(void);
 void showGpmTypeMenu(void);
