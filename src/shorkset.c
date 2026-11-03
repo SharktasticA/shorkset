@@ -61,6 +61,7 @@ int EXIT_NO = 0;
 char KERNEL_VER[KERNEL_VER_LEN] = {0};
 char KEYMAPS[MAX_KEYMAPS][PATH_MAX] = {0};
 int KEYMAPS_COUNT = 0;
+int IS_INP_MODULES = 0;
 int IS_NET_MODULES = 0;
 int IS_PBR_MODULES = 0;
 int IS_SND_MODULES = 0;
@@ -683,7 +684,9 @@ int loadModules(void)
             MODULES[MODULES_NO].description = fields[4];
 
             // Flag which driver categories were sound
-            if (!IS_NET_MODULES && strcmp(fields[2], "net") == 0)
+            if (!IS_INP_MODULES && strcmp(fields[2], "inp") == 0)
+                IS_INP_MODULES = 1;
+            else if (!IS_NET_MODULES && strcmp(fields[2], "net") == 0)
                 IS_NET_MODULES = 1;
             else if (!IS_PBR_MODULES && strcmp(fields[2], "pbr") == 0)
                 IS_PBR_MODULES = 1;
@@ -1226,8 +1229,12 @@ void showDriverCatsMenu(void)
 {
     MenuItem rawMenu[] = {
         {
-            "fb", "Framebuffers", NULL, showFBDriversMenu,
+            "fb", "Framebuffer", NULL, showFBDriversMenu,
             IS_VESAFB && IS_VGA16FB
+        },
+        {
+            "inp", "Input device", NULL, showInpDriversMenu,
+            IS_INP_MODULES, 0
         },
         {
             "net", "Network interface", NULL, showNetDriversMenu,
@@ -1356,7 +1363,15 @@ void showDriversListMenu(const char *cat)
 
     char title[32] = {0};
     char msg[300] = {0};
-    if (strcmp(cat, "net") == 0)
+    if (strcmp(cat, "inp") == 0)
+    {
+        snprintf(title, 32, "Toggle input device driver");
+        snprintf(msg, 300, "Select one or more drivers to load or unload "
+            "their Linux modules. Note: AT and PS/2 keyboards, and serial "
+            "and PS/2 mice, should already be covered by the kernel's "
+            "built-in drivers.");
+    }
+    else if (strcmp(cat, "net") == 0)
     {
         snprintf(title, 32, "Toggle network interface driver");
         snprintf(msg, 300, "Select one or more drivers to load or unload "
@@ -2589,6 +2604,11 @@ void showHelp(void)
     }
 }
 
+void showInpDriversMenu(void)
+{
+    showDriversListMenu("inp");
+}
+
 /**
  * Displays keyboard layout selection menu
  */
@@ -2797,8 +2817,8 @@ int showMainMenu(void)
             "Drivers",
             "",
             showDriverCatsMenu,
-            getFBDrivers() || IS_NET_MODULES || IS_PBR_MODULES ||
-            IS_SND_MODULES
+            getFBDrivers() || IS_INP_MODULES || IS_NET_MODULES ||
+            IS_PBR_MODULES || IS_SND_MODULES
         },
         { 
             "swp",

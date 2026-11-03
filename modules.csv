@@ -1,4 +1,5 @@
 Name,Path,Category,Bus,Description
+pc110pad,kernel/drivers/input/mouse/pc110pad.ko.gz,inp,ISA,IBM Palm Top PC 110 trackpad
 3c509,kernel/drivers/net/ethernet/3com/3c509.ko.gz,net,ISA,3Com 3c509/3c579 EtherLink III
 3c515,kernel/drivers/net/ethernet/3com/3c515.ko.gz,net,ISA,3Com 3c515 Fast EtherLink
 3c574_cs,kernel/drivers/net/ethernet/3com/3c574_cs.ko.gz,net,PCMCIA 16-bit,3Com 3c574 Fast EtherLink
